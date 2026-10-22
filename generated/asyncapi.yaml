@@ -88,6 +88,11 @@ operations:
     x-delivery-semantics: at-least-once; duplicates and out-of-order delivery possible
     x-authorization: AWS SigV4 using a scoped workload identity and queue/KMS policies.
       No end-user JWT is placed in a message.
+    x-security-invariant-profile: "#/x-security-invariants"
+    description: Send only immutable events from committed regional outbox/publication
+      evidence. Preserve identity/content across attempts; receivers require provenance,
+      tenant/workflow binding and current effect/retention/recovery fences. A successful
+      send is transport acceptance, not business or erasure completion.
   publishDisclosureIntent:
     action: send
     title: API durably publishes authorized disclosure intent before returning protected
@@ -99,6 +104,11 @@ operations:
     x-delivery-semantics: at-least-once; duplicates and out-of-order delivery possible
     x-authorization: AWS SigV4 using a scoped workload identity and queue/KMS policies.
       No end-user JWT is placed in a message.
+    x-security-invariant-profile: "#/x-security-invariants"
+    description: Publish the exact frozen authorized disclosure intent through the
+      separate audit producer role. Await durable acceptance, then revalidate freshness/deadline/erasure
+      fences before response bytes. Changed projection uses a new event identity or
+      aborts. This operation does not add a per-read patient-database outbox.
 components:
   messages:
     PatientCreated:
@@ -129,6 +139,7 @@ components:
             recordRevision: 1
             accessGeneration: 0
             deletionGeneration: 0
+      x-security-invariant-profile: "#/x-security-invariants"
     PatientUpdated:
       name: PatientUpdated
       title: patient.updated v1
@@ -157,6 +168,7 @@ components:
             recordRevision: 2
             accessGeneration: 0
             deletionGeneration: 0
+      x-security-invariant-profile: "#/x-security-invariants"
     PatientRestricted:
       name: PatientRestricted
       title: patient.restricted v1
@@ -186,6 +198,7 @@ components:
             accessGeneration: 1
             deletionGeneration: 0
             restrictionPolicyVersion: policy_synthetic_0002
+      x-security-invariant-profile: "#/x-security-invariants"
     PatientErasureCompleted:
       name: PatientErasureCompleted
       title: patient.erasure.completed v1
@@ -216,6 +229,11 @@ components:
             deletionGeneration: 1
             erasureRequestId: erase_synthetic_0001
             completionEvidenceRef: proof_synthetic_0001
+            retentionDecisionGeneration: 1
+      x-security-invariant-profile: "#/x-security-invariants"
+      x-erasure-authority: Verify committed provenance and current tenant/patient/request,
+        deletion and retention-decision generations, workflow/hold state and participant/recovery
+        fences; stale event or callback is not authority.
     AuditDisclosureIntent:
       name: AuditDisclosureIntent
       title: audit.disclosure.intent v1
@@ -251,6 +269,10 @@ components:
               fieldCategories:
               - name
               - name.display
+      x-security-invariant-profile: "#/x-security-invariants"
+      x-audit-disclosure: Frozen exact projection; durable intent acceptance precedes
+        response; final freshness/deadline/fence validation required; abort or new
+        identity if projection changes.
     PatientErasureStarted:
       name: PatientErasureStarted
       title: patient.erasure.started v1
@@ -280,6 +302,11 @@ components:
             accessGeneration: 1
             deletionGeneration: 1
             erasureRequestId: erase_synthetic_0001
+            retentionDecisionGeneration: 1
+      x-security-invariant-profile: "#/x-security-invariants"
+      x-erasure-authority: Verify committed provenance and current tenant/patient/request,
+        deletion and retention-decision generations, workflow/hold state and participant/recovery
+        fences; stale event or callback is not authority.
   schemas:
     OpaqueReference:
       type: string
@@ -385,6 +412,14 @@ components:
           "$ref": "#/components/schemas/OpaqueReference"
         completionEvidenceRef:
           "$ref": "#/components/schemas/OpaqueReference"
+        retentionDecisionGeneration:
+          type: integer
+          minimum: 1
+          maximum: 9007199254740991
+          description: Authoritative monotonic retention/legal-hold decision generation
+            for this erasure workflow. A superseded generation cannot authorize destructive
+            work or completion; current workflow/participant fences still must be
+            checked. This is not a permission grant or the deletion generation.
       required:
       - patientId
       - recordRevision
@@ -392,9 +427,12 @@ components:
       - deletionGeneration
       - erasureRequestId
       - completionEvidenceRef
-      description: Emitted only after the erasure workflow is completed, including
-        its backup/restore and registered-copy obligations. Never emitted for 202
-        acceptance or active_data_erased alone; unresolved retention is not completion.
+      - retentionDecisionGeneration
+      description: Emitted only after verified workflow completion under the recorded
+        retention-decision generation, including backup/restore and registered-copy
+        obligations. Current authenticated participant evidence and recovery fences
+        are required. Never emitted for 202 acceptance, active_data_erased, queue
+        acceptance, stale evidence or unresolved retention.
     AuditDisclosureReference:
       type: object
       additionalProperties: false
@@ -464,9 +502,12 @@ components:
       - decision
       - policyVersion
       - disclosures
-      description: Restricted application audit intent, not proof of browser receipt.
-        Empty disclosures is valid for an authorized no-match lookup. No token, raw
-        claims, search value, contact data or free text.
+      description: Restricted intent derived from the exact frozen authorized response
+        projection; not proof of browser receipt. After durable acknowledgment, revalidate
+        freshness/deadline and erasure/disclosure fences before response bytes. A
+        changed projection requires abort or a new event identity. Empty disclosures
+        is valid for an authorized no-match lookup. No token, raw claims, search value,
+        contact data or free text.
     PatientCreatedEvent:
       type: object
       additionalProperties: false
@@ -477,15 +518,18 @@ components:
         id:
           type: string
           format: uuid
-          description: Immutable event ID allocated once. Same source and id across
-            retry, relay and replay; uniqueness is source plus id.
+          description: Immutable event ID allocated once. Preserve source/id/content
+            across retry, relay and replay. Same source/id with changed inner content
+            is an integrity failure, not a duplicate to ignore; see the normative
+            security invariant profile.
         source:
           type: string
           format: uri
-          pattern: "^urn:patient-contact:(preview|production):[a-z0-9-]+:[a-z0-9-]+:(domain|audit)$"
-          description: 'Publisher context: environment, AWS region and cell, without
-            tenant/patient identifiers. Deployment inventory must verify this trusted
-            source and residency.'
+          pattern: "^urn:patient-contact:(preview|production):[a-z0-9-]+:[a-z0-9-]+:domain$"
+          description: 'Allowlisted domain publisher context: environment, AWS region
+            and cell, with no tenant/patient identifiers. Match transport authority
+            and committed publication evidence where applicable; matching this pattern
+            alone proves no provenance or residency authority.'
         type:
           type: string
           const: patientcontact.patient.created.v1
@@ -521,9 +565,10 @@ components:
       - dataschema
       - tenantid
       - data
-      description: Project allowlisted structured CloudEvents JSON profile. Unknown
-        envelope/data fields are rejected by this version; CloudEvents permits extensions
-        generally, but this project publishes only reviewed extensions.
+      description: Closed structured CloudEvents JSON profile; unknown fields rejected.
+        Producer provenance, immutable-content deduplication, current authorization/fences,
+        replay safety and audit semantics are additional normative requirements in
+        x-security-invariants; schema validation alone cannot enforce them.
     PatientUpdatedEvent:
       type: object
       additionalProperties: false
@@ -534,15 +579,18 @@ components:
         id:
           type: string
           format: uuid
-          description: Immutable event ID allocated once. Same source and id across
-            retry, relay and replay; uniqueness is source plus id.
+          description: Immutable event ID allocated once. Preserve source/id/content
+            across retry, relay and replay. Same source/id with changed inner content
+            is an integrity failure, not a duplicate to ignore; see the normative
+            security invariant profile.
         source:
           type: string
           format: uri
-          pattern: "^urn:patient-contact:(preview|production):[a-z0-9-]+:[a-z0-9-]+:(domain|audit)$"
-          description: 'Publisher context: environment, AWS region and cell, without
-            tenant/patient identifiers. Deployment inventory must verify this trusted
-            source and residency.'
+          pattern: "^urn:patient-contact:(preview|production):[a-z0-9-]+:[a-z0-9-]+:domain$"
+          description: 'Allowlisted domain publisher context: environment, AWS region
+            and cell, with no tenant/patient identifiers. Match transport authority
+            and committed publication evidence where applicable; matching this pattern
+            alone proves no provenance or residency authority.'
         type:
           type: string
           const: patientcontact.patient.updated.v1
@@ -578,9 +626,10 @@ components:
       - dataschema
       - tenantid
       - data
-      description: Project allowlisted structured CloudEvents JSON profile. Unknown
-        envelope/data fields are rejected by this version; CloudEvents permits extensions
-        generally, but this project publishes only reviewed extensions.
+      description: Closed structured CloudEvents JSON profile; unknown fields rejected.
+        Producer provenance, immutable-content deduplication, current authorization/fences,
+        replay safety and audit semantics are additional normative requirements in
+        x-security-invariants; schema validation alone cannot enforce them.
     PatientRestrictedEvent:
       type: object
       additionalProperties: false
@@ -591,15 +640,18 @@ components:
         id:
           type: string
           format: uuid
-          description: Immutable event ID allocated once. Same source and id across
-            retry, relay and replay; uniqueness is source plus id.
+          description: Immutable event ID allocated once. Preserve source/id/content
+            across retry, relay and replay. Same source/id with changed inner content
+            is an integrity failure, not a duplicate to ignore; see the normative
+            security invariant profile.
         source:
           type: string
           format: uri
-          pattern: "^urn:patient-contact:(preview|production):[a-z0-9-]+:[a-z0-9-]+:(domain|audit)$"
-          description: 'Publisher context: environment, AWS region and cell, without
-            tenant/patient identifiers. Deployment inventory must verify this trusted
-            source and residency.'
+          pattern: "^urn:patient-contact:(preview|production):[a-z0-9-]+:[a-z0-9-]+:domain$"
+          description: 'Allowlisted domain publisher context: environment, AWS region
+            and cell, with no tenant/patient identifiers. Match transport authority
+            and committed publication evidence where applicable; matching this pattern
+            alone proves no provenance or residency authority.'
         type:
           type: string
           const: patientcontact.patient.restricted.v1
@@ -635,9 +687,10 @@ components:
       - dataschema
       - tenantid
       - data
-      description: Project allowlisted structured CloudEvents JSON profile. Unknown
-        envelope/data fields are rejected by this version; CloudEvents permits extensions
-        generally, but this project publishes only reviewed extensions.
+      description: Closed structured CloudEvents JSON profile; unknown fields rejected.
+        Producer provenance, immutable-content deduplication, current authorization/fences,
+        replay safety and audit semantics are additional normative requirements in
+        x-security-invariants; schema validation alone cannot enforce them.
     PatientErasureCompletedEvent:
       type: object
       additionalProperties: false
@@ -648,15 +701,18 @@ components:
         id:
           type: string
           format: uuid
-          description: Immutable event ID allocated once. Same source and id across
-            retry, relay and replay; uniqueness is source plus id.
+          description: Immutable event ID allocated once. Preserve source/id/content
+            across retry, relay and replay. Same source/id with changed inner content
+            is an integrity failure, not a duplicate to ignore; see the normative
+            security invariant profile.
         source:
           type: string
           format: uri
-          pattern: "^urn:patient-contact:(preview|production):[a-z0-9-]+:[a-z0-9-]+:(domain|audit)$"
-          description: 'Publisher context: environment, AWS region and cell, without
-            tenant/patient identifiers. Deployment inventory must verify this trusted
-            source and residency.'
+          pattern: "^urn:patient-contact:(preview|production):[a-z0-9-]+:[a-z0-9-]+:domain$"
+          description: 'Allowlisted domain publisher context: environment, AWS region
+            and cell, with no tenant/patient identifiers. Match transport authority
+            and committed publication evidence where applicable; matching this pattern
+            alone proves no provenance or residency authority.'
         type:
           type: string
           const: patientcontact.patient.erasure.completed.v1
@@ -692,9 +748,10 @@ components:
       - dataschema
       - tenantid
       - data
-      description: Project allowlisted structured CloudEvents JSON profile. Unknown
-        envelope/data fields are rejected by this version; CloudEvents permits extensions
-        generally, but this project publishes only reviewed extensions.
+      description: Closed structured CloudEvents JSON profile; unknown fields rejected.
+        Producer provenance, immutable-content deduplication, current authorization/fences,
+        replay safety and audit semantics are additional normative requirements in
+        x-security-invariants; schema validation alone cannot enforce them.
     AuditDisclosureIntentEvent:
       type: object
       additionalProperties: false
@@ -705,15 +762,18 @@ components:
         id:
           type: string
           format: uuid
-          description: Immutable event ID allocated once. Same source and id across
-            retry, relay and replay; uniqueness is source plus id.
+          description: Immutable event ID allocated once. Preserve source/id/content
+            across retry, relay and replay. Same source/id with changed inner content
+            is an integrity failure, not a duplicate to ignore; see the normative
+            security invariant profile.
         source:
           type: string
           format: uri
-          pattern: "^urn:patient-contact:(preview|production):[a-z0-9-]+:[a-z0-9-]+:(domain|audit)$"
-          description: 'Publisher context: environment, AWS region and cell, without
-            tenant/patient identifiers. Deployment inventory must verify this trusted
-            source and residency.'
+          pattern: "^urn:patient-contact:(preview|production):[a-z0-9-]+:[a-z0-9-]+:audit$"
+          description: 'Allowlisted audit publisher context: environment, AWS region
+            and cell, with no tenant/patient identifiers. Match transport authority
+            and committed publication evidence where applicable; matching this pattern
+            alone proves no provenance or residency authority.'
         type:
           type: string
           const: patientcontact.audit.disclosure.intent.v1
@@ -749,9 +809,10 @@ components:
       - dataschema
       - tenantid
       - data
-      description: Project allowlisted structured CloudEvents JSON profile. Unknown
-        envelope/data fields are rejected by this version; CloudEvents permits extensions
-        generally, but this project publishes only reviewed extensions.
+      description: Closed structured CloudEvents JSON profile; unknown fields rejected.
+        Producer provenance, immutable-content deduplication, current authorization/fences,
+        replay safety and audit semantics are additional normative requirements in
+        x-security-invariants; schema validation alone cannot enforce them.
     ErasureStartedData:
       type: object
       additionalProperties: false
@@ -778,16 +839,27 @@ components:
             all non-erasure events for this immutable patient ID.
         erasureRequestId:
           "$ref": "#/components/schemas/OpaqueReference"
+        retentionDecisionGeneration:
+          type: integer
+          minimum: 1
+          maximum: 9007199254740991
+          description: Authoritative monotonic retention/legal-hold decision generation
+            for this erasure workflow. A superseded generation cannot authorize destructive
+            work or completion; current workflow/participant fences still must be
+            checked. This is not a permission grant or the deletion generation.
       required:
       - patientId
       - recordRevision
       - accessGeneration
       - deletionGeneration
       - erasureRequestId
-      description: 'Committed fact that authorized erasure processing entered its
-        restricted phase with a deletion generation. Not completion or unconditional
-        authority to purge: handler validates the current workflow, generation, holds
-        and participant fence.'
+      - retentionDecisionGeneration
+      description: 'Committed fact that authorized erasure processing entered or resumed
+        its restricted phase under this deletion and retention-decision generation.
+        A resumed authorization creates a new immutable event, not a retry mutation.
+        Not completion or unconditional authority to purge: validate the current tenant/patient/workflow
+        tuple, hold state, decision generation and participant fence before destructive
+        work.'
     PatientErasureStartedEvent:
       type: object
       additionalProperties: false
@@ -798,15 +870,18 @@ components:
         id:
           type: string
           format: uuid
-          description: Immutable event ID allocated once. Same source and id across
-            retry, relay and replay; uniqueness is source plus id.
+          description: Immutable event ID allocated once. Preserve source/id/content
+            across retry, relay and replay. Same source/id with changed inner content
+            is an integrity failure, not a duplicate to ignore; see the normative
+            security invariant profile.
         source:
           type: string
           format: uri
-          pattern: "^urn:patient-contact:(preview|production):[a-z0-9-]+:[a-z0-9-]+:(domain|audit)$"
-          description: 'Publisher context: environment, AWS region and cell, without
-            tenant/patient identifiers. Deployment inventory must verify this trusted
-            source and residency.'
+          pattern: "^urn:patient-contact:(preview|production):[a-z0-9-]+:[a-z0-9-]+:domain$"
+          description: 'Allowlisted domain publisher context: environment, AWS region
+            and cell, with no tenant/patient identifiers. Match transport authority
+            and committed publication evidence where applicable; matching this pattern
+            alone proves no provenance or residency authority.'
         type:
           type: string
           const: patientcontact.patient.erasure.started.v1
@@ -842,12 +917,13 @@ components:
       - dataschema
       - tenantid
       - data
-      description: Project allowlisted structured CloudEvents JSON profile. Unknown
-        envelope/data fields are rejected by this version; CloudEvents permits extensions
-        generally, but this project publishes only reviewed extensions.
+      description: Closed structured CloudEvents JSON profile; unknown fields rejected.
+        Producer provenance, immutable-content deduplication, current authorization/fences,
+        replay safety and audit semantics are additional normative requirements in
+        x-security-invariants; schema validation alone cannot enforce them.
 x-document-metadata:
   id: EVENT-CONTRACT-001
-  version: 0.1.0
+  version: 0.2.0
   status: proposed
   approval_status: pending
   authors:
@@ -857,6 +933,103 @@ x-document-metadata:
   updated: '2026-10-22'
   owner_role: API and event contract owners
   supersedes: []
-x-validation-status: JSON/reference/example consistency checks only until a pinned
-  AsyncAPI 3.1.0 parser, schema validator, renderer and Go generation profile are
-  qualified. No generated client or runtime conformance claimed.
+  superseded_by: []
+x-validation-status: JSON/reference/example and used-schema-keyword consistency checks
+  only. Normative security extensions require application/transport conformance tests.
+  Exact AsyncAPI 3.1.0 parser, general schema validation, renderer and Go generation
+  remain unqualified; no runtime/security conformance claimed.
+x-security-invariants:
+  status: proposed; normative application and transport requirements, not enforced
+    by AsyncAPI schema validation alone
+  producerProvenance:
+    domain: Before dispatch, match source/id/tenantid/patientId/type/dataschema/generations
+      and immutable content to the committed outbox record or protected immutable
+      publication evidence. Retain that evidence for the permitted replay horizon.
+      Verify tenant placement and migration authority independently.
+    audit: Only the separately authorized API audit producer may publish disclosure
+      intent. Derive actorRef, tenant, patient references and fields from the validated
+      backend decision and frozen response, never caller-supplied event claims. No
+      per-read DynamoDB outbox is introduced.
+    transport: Use TLS/SigV4 with scoped IAM queue/KMS roles. The inner source string
+      or tenantid is not authentication. Validate permitted AWS-service source accounts/ARNs
+      and native-wrapper adapter before trusting a delivery.
+    roles: Relay, audit producer, audit archive writer, erasure participant and queue/retention
+      administrator have distinct required capabilities. Ordinary workers cannot purge
+      queues, bulk redrive, change retention/holds, restore/export data or administer
+      keys.
+  identityAndIntegrity:
+    identity: consumer identity + inner CloudEvents source + id
+    content: Persist a digest of the entire inner CloudEvent under a qualified versioned
+      canonical-JSON serialization. Include tenant/type/schema/data; exclude native
+      broker delivery metadata. Immutable producer evidence uses the same content
+      comparison.
+    identicalRedelivery: Same identity and identical content is an idempotent duplicate.
+    conflictingRedelivery: 'Same identity and different content is an integrity failure:
+      quarantine/alert without overwriting prior evidence or silently accepting it
+      as processed.'
+    authority: A digest comparison detects conflicting content against protected evidence;
+      it does not authenticate an untrusted publisher.
+  consumerEffects:
+    atomicity: Persist inbox and local effect or durable work intent together, conditioned
+      on current record/restriction/deletion fences. A prior strong read alone is
+      insufficient.
+    externalEffects: External destinations enforce idempotency and generation fences.
+      Erasure participants close admission, fence, drain/cancel in-flight work, purge
+      and verify before acknowledging completion.
+    restriction: Late ordinary updates cannot lower access generation or undo current
+      restrictions; events are not permission grants.
+    erasure: Terminal tombstones dominate replay, and erased patient IDs are not reused.
+      The erasure-start message is an approved workflow fact, not unconditional purge
+      authority.
+  retentionAndCompletion:
+    decisionFence: Destructive admission/effects require the current authoritative
+      retentionDecisionGeneration, workflow state, approved action, registered participant
+      and work fence. Newly accepted holds advance the decision generation and invalidate
+      outstanding destructive admission.
+    staleStart: A superseded start decision cannot authorize purge. Preserve/reconcile
+      the workflow; resumption requires an explicit authorized transition and new
+      immutable event identity with the current decision generation, not mutation
+      of the old event.
+    completionEvidence: Callbacks are authenticated and bound to tenant/patient/request,
+      deletion and retention-decision generations, registered participant, work attempt
+      and recovery epoch. Stale evidence cannot advance completion.
+    completionMeaning: completed includes all defined backup/restore and registered-copy
+      obligations; active_data_erased, queue acceptance, stale callbacks and unresolved
+      retention are insufficient.
+    holdRace: Serialize hold changes with deletion admission. Bound in-flight destructive
+      units and report deletion already committed before a hold accurately; no retroactive
+      undo is promised.
+  auditDisclosure:
+    freeze: Freeze the response projection and exact audit references/revisions/field
+      categories/policy version together.
+    revalidate: After durable acknowledgment and before response bytes, recheck authorization
+      freshness, deadline and erasure/disclosure fences. Do not enlarge or substitute
+      the accepted projection.
+    changedProjection: Abort or issue a newly authorized projection with a new audit
+      event identity within the deadline; never mutate/reuse an accepted intent identity.
+    meaning: An accepted intent may outlive an aborted response and is not proof of
+      browser receipt.
+    archive: Append idempotently with integrity evidence; separate append from archive-administration/deletion
+      rights and protect privileged access logs.
+  recoveryAndReplay:
+    epoch: Restore/rebuild starts a fenced recovery epoch. Reconcile actual data,
+      inbox state, participant receipts and the protected current erasure ledger before
+      readiness.
+    oldEvidence: An old processed inbox record or receipt does not prove a restored
+      copy is erased; re-establish local effects/fences and reject former-epoch callbacks.
+    retention: Minimize and classify inboxes, provenance, tombstones, queues/DLQs
+      and archives as restricted linkable data with approved retention/replay horizons.
+    redrive: Authorized bounded redrive preserves identity/content, re-runs provenance/schema/fence
+      checks, and never changes residency or bypasses tombstones.
+  resourceBounds:
+    required: Enforce reviewed byte/depth/string/array/batch/deadline and retry/work-amplification
+      bounds before expensive processing. Reject duplicate JSON member names and unsupported
+      encodings.
+    schemas: Resolve only pinned local/controlled schema identities; no runtime network
+      fetch from event dataschema.
+    fairness: Bound tenant/producer/cell work and reserve audit/erasure capacity.
+      Accepted required audits cannot be sampled or silently dropped.
+    quarantine: Use restricted regional quarantine/DLQ with bounded retries. Never
+      put rejected event bodies, identifiers or raw parser errors in ordinary logs.
+    qualification: Numerical operating budgets remain to be selected and tested against
+      maximum valid messages before implementation acceptance.

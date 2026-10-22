@@ -1,6 +1,6 @@
 ---
 id: FOLLOWUPS-001
-version: 0.2.0
+version: 0.3.0
 status: proposed
 approval_status: pending
 authors: [Codex]
@@ -28,12 +28,15 @@ This queue belongs only to the standalone health-organization design. Owner role
 | F-010 | API and operations owners | Design authoritative low-cardinality usage counters and restricted consumer registry for retirement. | Complete bounded usage accounting and migration alerts inform explicit retention decisions; authoritative registry generations, holds/pins and fail-closed lifecycle reconciliation govern decommissioning. |
 | F-011 | Identity and API owners | Approve persona templates, delegation ceilings, claim mappings and persona-management transport contract. | Authenticated administration specification and conformance cases for custom personas, assignment, revocation and self-escalation prevention. |
 | F-012 | Security and platform owners | Select authorization evaluator and qualify AWS Verified Permissions if considered. | Measured regional availability/latency, policy correctness and revocation behavior; no assumption a remote decision service meets the existing budget. |
-| F-013 | Documentation/tooling owner | Implement reproducible contract/ERD/diagram generation and rendering checks in future CI. | Pinned tool support, full OpenAPI validation, schema-to-ERD drift checks and visual review; current generated artifacts are design-time exports only. |
+| F-013 | Documentation/tooling owner | Implement reproducible contract/ERD/diagram generation and rendering checks in future CI. | Pinned tool support, full OpenAPI validation, schema-to-ERD drift checks and visual review; current generated artifacts are design-time exports only; temporary Mermaid 12.0.0 grammar checks passed all 12 sources after the rendering-syntax corrections, while browser layout and CI automation remain unqualified. |
 | F-014 | Security and release owners | Qualify the user-approved automatic image-only maintenance lane. | Standing policy limits, allowed delta proof, independent checks and rollback evidence; application source/behavior changes retain ordinary review gates. |
 | F-015 | API and operations owners | Qualify automatic decommissioning outside the user-declared supported set. | Count/hold/pin resolution, shared-deployment references, source/policy epochs, route drain, retired-version response and no-resurrection race tests; inactivity is advisory rather than a hidden veto. |
 | F-016 | Security and platform owners | Select approved hardened-image publishers, release feeds, signature trust, explicit version/digest pins and update-response targets. | Qualified image catalog and release-triggered rebuild/rollout matrix for last approved service sources; no reactivation of pruned targets. |
 | F-017 | QA, API and identity owners | Qualify full API session journeys and deauthentication semantics. | Real provider flow, chained returned-state usage, supported-version behavior, refresh/revocation, tenant/field denials and audit/erasure evidence in isolated AWS tests. |
-
 | F-018 | API, integration and security owners | Qualify AsyncAPI/CloudEvents tooling and producer/consumer contracts. | Pinned compatible parser, validator, generator/documentation tools, real transport round trips, schema/behavior compatibility, event privacy and replay/erasure evidence. |
+
+| F-019 | Security and API owners | Close the [security review](security-review.md) findings with implementation and independent evidence. | Named owners; request-boundary abuse matrix; JWT/callback/revocation qualification; pooled-role acceptance; ASVS applicability map and independent penetration test. |
+| F-020 | Privacy, integration and platform owners | Qualify publication provenance, hold/destructive-work admission, audit freezing and recovery epochs. | Real transaction/participant race tests, changed-content dedup rejection and synthetic restore with old receipts; separate control-audit contracts before management implementation. |
+| F-021 | Platform and security owners | Qualify CI/AI/cluster trust boundaries and compromised-supplier incident response. | Build override and poisoned artifact denial, pod/role/IMDS isolation, ALB origin and WAF sampling privacy tests, digest revocation and recovery exercise with approved owners. |
 
 Implementation work, CI definitions, real environment creation and production releases remain outside the currently authorized documentation scope.

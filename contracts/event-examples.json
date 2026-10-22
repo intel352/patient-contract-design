@@ -80,7 +80,8 @@
           "recordRevision": 4,
           "accessGeneration": 1,
           "deletionGeneration": 1,
-          "erasureRequestId": "erase_synthetic_0001"
+          "erasureRequestId": "erase_synthetic_0001",
+          "retentionDecisionGeneration": 1
         }
       }
     },
@@ -102,7 +103,8 @@
           "accessGeneration": 1,
           "deletionGeneration": 1,
           "erasureRequestId": "erase_synthetic_0001",
-          "completionEvidenceRef": "proof_synthetic_0001"
+          "completionEvidenceRef": "proof_synthetic_0001",
+          "retentionDecisionGeneration": 1
         }
       }
     },

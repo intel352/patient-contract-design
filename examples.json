@@ -195,5 +195,35 @@
       "code": "authentication_required",
       "requestId": "rq_example01"
     }
+  },
+  "invalid_request": {
+    "schema": "Problem",
+    "value": {
+      "type": "https://api.example.test/problems/invalid-request",
+      "title": "Invalid request",
+      "status": 400,
+      "code": "invalid_request",
+      "requestId": "req_synthetic_boundary"
+    }
+  },
+  "content_too_large": {
+    "schema": "Problem",
+    "value": {
+      "type": "https://api.example.test/problems/content-too-large",
+      "title": "Content too large",
+      "status": 413,
+      "code": "content_too_large",
+      "requestId": "req_synthetic_boundary"
+    }
+  },
+  "unsupported_media_type": {
+    "schema": "Problem",
+    "value": {
+      "type": "https://api.example.test/problems/unsupported-media-type",
+      "title": "Unsupported media type",
+      "status": 415,
+      "code": "unsupported_media_type",
+      "requestId": "req_synthetic_boundary"
+    }
   }
 }

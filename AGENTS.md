@@ -6,7 +6,7 @@ Scope: this standalone theoretical patient-contact project only. Do not import u
 
 1. Read [project standards](docs/project-standards.md), [architecture](architecture.md) and relevant accepted [decisions](decisions/).
 2. Read [API versioning](docs/api-versioning.md) for any observable API change and [delivery](docs/delivery-and-environments.md) for build/release/environment changes.
-   Read [event contracts](docs/events.md) for CloudEvents/AsyncAPI boundaries. Read [image maintenance](docs/image-maintenance.md) for container/toolchain changes and [API testing](docs/api-testing.md) for required evidence at every layer.
+   Read [security review](docs/security-review.md) for the threat model, strict request handling, pooled-isolation limits and required negative evidence. Read [event contracts](docs/events.md) for CloudEvents/AsyncAPI boundaries. Read [image maintenance](docs/image-maintenance.md) for container/toolchain changes and [API testing](docs/api-testing.md) for required evidence at every layer.
 3. Follow [document governance](docs/document-governance.md). Distinguish confirmed requirements from proposed defaults. Never claim a human approved an artifact without recorded evidence.
 4. Current product scope is documentation/specification/diagram work only. Do not implement application code, CI workflows, infrastructure or deployments without a subsequent implementation request. Repository creation and direct commit/push are explicitly authorized below.
 

@@ -1,6 +1,6 @@
 ---
 id: DIAGRAMS-001
-version: 0.2.0
+version: 0.3.0
 status: proposed
 approval_status: pending
 authors: [Codex]
@@ -161,6 +161,8 @@ erDiagram
         string tenant_id PK
         string request_id PK
         string restricted_patient_reference
+        integer retention_decision_generation
+        string workflow_revision
         string status
     }
     OUTBOX_EVENT {
@@ -198,7 +200,7 @@ flowchart TD
     Auth -->|Yes| Principal[Resolve stable principal and fresh policy context]
     Principal --> Invoke{Permitted to invoke API?}
     Invoke -->|No| Forbidden[403 or non-disclosing denial]
-    Invoke -->|Yes| Version{Supported requested major and minor?}
+    Invoke -->|Yes| Version{Exact requested MAJOR.MINOR.PATCH supported?}
     Version -->|Invalid or unknown| BadVersion[400 with safe problem]
     Version -->|Retired| Gone[410 with protected migration guidance]
     Version -->|Yes| Tenant[Bind tenant and regional owner]
@@ -230,7 +232,7 @@ sequenceDiagram
     alt Invalid credentials
         API-->>Client: 401, no business or version result
     else Valid credentials
-        API->>Policy: Resolve principal; verify membership, policy version and revocation freshness
+        API->>Policy: Resolve principal, verify membership, policy version and revocation freshness
         alt Stale authorization state
             API-->>Client: Safe unavailable/denied result, no patient values
         else Current authorization
@@ -258,13 +260,13 @@ sequenceDiagram
     opt Candidates present
         API->>DB: Strong BatchGet of current patient items
         DB-->>API: Records and any UnprocessedKeys
-        API->>API: Bounded retry; recheck association/revision/state and row/field policy
+        API->>API: Bounded retry, recheck association/revision/state and row/field policy
     end
     API->>Q: Restricted disclosure-intent event
     Q-->>API: Durable acknowledgment
     API->>API: Recheck request deadline and authorization freshness
     API-->>Client: Permitted matches or legitimate empty result, actual API-Version
-    Client->>Client: Render usable result; finish browser measurement
+    Client->>Client: Render usable result, finish browser measurement
 ```
 
 Every dependency failure remains subject to the deadline and safe-error contract; the diagram's happy-path arrows do not guarantee latency. Query and BatchGet do not form a snapshot. The maximum page, candidate overscan and retry policy must remain bounded and measurable. An empty result is not permission to discard unresolved reads. Audit acknowledgment proves durable intent acceptance, not browser receipt.
@@ -273,34 +275,40 @@ Every dependency failure remains subject to the deadline and safe-error contract
 
 ```mermaid
 sequenceDiagram
-    participant Actor as Authorized privacy actor
+    participant PrivacyActor as Authorized privacy actor
     participant API as Go service
     participant DB as DynamoDB and durable outbox
     participant Worker as Erasure worker
     participant Copies as Registered downstream copies
     participant Restore as Isolated restore process
-    Actor->>API: Authenticated idempotent erasure request
-    API->>API: Authorize and evaluate retention or hold policy
+    PrivacyActor->>API: Authenticated idempotent erasure request
+    API->>API: Authorize current retention decision and hold fences
     API->>DB: Persist request and decision
-    API-->>Actor: 202 accepted with tracked status
+    API-->>PrivacyActor: 202 accepted with tracked status
     opt Approved for erasure
         API->>DB: Atomic restrict, advance generation and create outbox event
         DB-->>Worker: Stream wakeup or pending-event reconciliation
         Worker->>Worker: Drain bounded prior response work
-        Worker->>DB: Delete contact and mappings; preserve protected suppression state
+        Worker->>DB: Delete contact and mappings under current fences, retaining suppression state
         Worker->>Copies: Idempotent removal requests with generation
-        Copies-->>Worker: Completion evidence or tracked retention
-        Worker->>DB: Mark active-data erasure; track backup expiry separately
+        Copies-->>Worker: Completion evidence for current attempt and recovery epoch, or tracked retention
+        Worker->>DB: Mark active-data erasure, track backup expiry separately
     end
     Restore->>DB: Restore backup into isolated, non-serving tables
-    Restore->>Restore: Reapply erasure ledger; reconcile invariants and capacity
+    Restore->>Restore: Reapply current ledger and reconcile old inbox receipts, invariants and capacity
     Restore->>Restore: Verify before authorizing live traffic
 ```
 
-The whole request is scoped to one tenant/patient, not every organization sharing a phone. Retained data and incomplete backup expiry remain explicit statuses. A delayed retry or a restore cannot override a deletion generation. Earlier bytes already transmitted cannot be recalled.
+The whole request is scoped to one tenant/patient, not every organization sharing a phone. Retained data and incomplete backup expiry remain explicit statuses. A delayed retry or a restore cannot override a deletion generation or use stale retention decisions/completion receipts. Hold acceptance is serialized with destructive-work admission; already committed deletion cannot be undone. Earlier bytes already transmitted cannot be recalled.
 
 ## Delivery and version lifecycle diagrams
 
 The canonical PR-to-preview-to-production diagram is in [delivery and environments](delivery-and-environments.md). The candidate/supported/scheduled-removal/draining/retired API state machine is in [API versioning](api-versioning.md). Those documents define the gates; this page does not duplicate or relax them.
 
 The asynchronous publication and consumption sequence is in [event contracts](events.md), with an [AsyncAPI contract](../contracts/asyncapi.json) for channel/message definitions and CloudEvents envelopes. The REST request sequences remain governed by OpenAPI.
+
+## Mermaid authoring and verification
+
+Keep message text in sequence diagrams free of literal semicolons: Mermaid treats them as statement separators. Use commas or separate messages instead. Avoid grammar keywords such as `Actor` as participant identifiers; use descriptive identifiers such as `PrivacyActor` with a readable alias. Quote labels when punctuation requires it, and validate all Mermaid blocks plus standalone `.mmd` files after changes.
+
+On 2026-10-22, Mermaid 12.0.0 reproduced three broken sequence blocks on this page and one in [events](events.md). Replacing message semicolons and renaming the erasure participant corrected those parser failures. Diagram syntax/rendering must remain a required future documentation gate (F-013), not merely a count of fenced blocks. All 12 repository diagram sources (11 fenced blocks and one `.mmd`) then passed Mermaid 12.0.0 grammar checks with jsdom 26.1.0 and strict security mode, compared with 8 of 12 before the fixes. This is parser evidence, not browser layout or live GitHub rendering verification. GitHub controls its deployed Mermaid version; qualification must record the parser version actually tested.

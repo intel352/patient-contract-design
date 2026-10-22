@@ -1,6 +1,6 @@
 ---
 id: GENERATED-001
-version: 0.2.0
+version: 0.3.0
 status: proposed
 approval_status: pending
 authors: [Codex]
@@ -24,7 +24,7 @@ These files were mechanically exported from the canonical design specification. 
 | [contract-entities.md](contract-entities.md) | Reviewable Markdown wrapper around the generated ERD. |
 | [manifest.json](manifest.json) | Source/output checksums, selected schemas, API/spec versions and generation scope. |
 
-The event contract uses AsyncAPI **3.1.0**, with independent draft `info.version: 0.1.0` and CloudEvents wire `specversion: "1.0"`. Event payload versions are separate. These exports do not prove a CLI, parser, model generator or broker accepts the contract; exact tooling qualification remains open.
+The event contract uses AsyncAPI **3.1.0**, with independent draft `info.version: 0.1.0` and CloudEvents wire `specversion: "1.0"`. Event payload versions are separate. The security revision adds publication/fencing requirements and positive retention-decision generations to erasure payloads. These exports do not prove a CLI, parser, model generator or broker accepts the contract; exact tooling qualification remains open.
 
 The REST canonical source is OpenAPI **3.2.1**; its independent API `info.version` remains **0.1.0**, an unreleased proposal. Future production `/v1` starts at an explicitly approved GA release, not by exporting these files.
 

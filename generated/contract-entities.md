@@ -16,7 +16,7 @@ Generated mechanically from the named `components.schemas` in [canonical OpenAPI
 
 ```mermaid
 %% Generated from ../openapi.json; design-time schema export, not database DDL.
-%% Source SHA256: 5c11e599971ce556f1e9e29e436e6b7582602f079537042e573d138e2567155e
+%% Source SHA256: cb30b976fba98ebd685ae26742383a54c57803d0ed58b47ecf3f394637abcb4b
 erDiagram
     PatientRead {
         string patientId "required"

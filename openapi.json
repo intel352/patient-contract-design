@@ -97,7 +97,7 @@
               "minLength": 16,
               "maxLength": 2048
             },
-            "description": "Opaque authenticated/handle cursor bound to principal, membership policy version, page size and expiry. Contains no PII; invalid or expired => 400."
+            "description": "Opaque authenticated/handle cursor bound to principal, membership policy version, page size and expiry. Contains no PII; invalid or expired => 400. Also bind exact API-Version, operation, ordering/codec semantics and current session/authorization context; mismatches return generic invalid_cursor 400. A protected opaque handle remains linkable metadata and is excluded from ordinary access logs."
           },
           {
             "$ref": "#/components/parameters/ApiVersion"
@@ -168,6 +168,12 @@
           },
           "410": {
             "$ref": "#/components/responses/ApiVersionRetired"
+          },
+          "413": {
+            "$ref": "#/components/responses/ContentTooLarge"
+          },
+          "415": {
+            "$ref": "#/components/responses/UnsupportedMediaType"
           }
         },
         "requestBody": {
@@ -256,6 +262,12 @@
           },
           "410": {
             "$ref": "#/components/responses/ApiVersionRetired"
+          },
+          "413": {
+            "$ref": "#/components/responses/ContentTooLarge"
+          },
+          "415": {
+            "$ref": "#/components/responses/UnsupportedMediaType"
           }
         },
         "requestBody": {
@@ -421,6 +433,12 @@
           },
           "410": {
             "$ref": "#/components/responses/ApiVersionRetired"
+          },
+          "413": {
+            "$ref": "#/components/responses/ContentTooLarge"
+          },
+          "415": {
+            "$ref": "#/components/responses/UnsupportedMediaType"
           }
         },
         "requestBody": {
@@ -512,6 +530,12 @@
           },
           "410": {
             "$ref": "#/components/responses/ApiVersionRetired"
+          },
+          "413": {
+            "$ref": "#/components/responses/ContentTooLarge"
+          },
+          "415": {
+            "$ref": "#/components/responses/UnsupportedMediaType"
           }
         },
         "requestBody": {
@@ -616,7 +640,7 @@
         "type": "http",
         "scheme": "bearer",
         "bearerFormat": "JWT",
-        "description": "Required Authorization: Bearer signed JWT access token on every declared application API operation. Authentication is stateless token verification within the service: no per-request provider/user-info/introspection or session-server round trip. Accept tokens only from explicitly allowlisted region-configured OAuth 2.0 / OpenID Connect providers; Cognito is the initial AWS provider, not an exclusive regional dependency. Browser sign-in uses authorization code + PKCE. The configured provider adapter verifies an allowed signing algorithm and signature with issuer-scoped cached/rotated JWKS, exact issuer, expiry/not-before, access-token purpose, intended API/client binding, subject and required scopes. Conventional providers require the configured API audience in aud. Cognito additionally requires token_use=access and an allowed client_id; validate aud where the configured token profile includes it. Never accept an ID token, a user-ID-only token, a refresh token, or arbitrary identity/group assertions as an API credential. An unverified issuer may select an existing configured verifier only; it must never trigger arbitrary discovery or network access. Map the validated exact issuer+subject pair to an immutable application principal; never auto-link by email. Configured issuer-specific claims may carry bounded coarse scopes, tenant context, persona hints or policy version, but these are normalized inputs to backend authorization, not automatic grants. Unconfigured claims/groups are ignored for authorization. Current trusted service policy decides tenant membership, action/search, record and child-field permissions. Token claims and token expiry alone do not satisfy the documented five-second application-accepted revocation/freshness bound: locally evaluated policy needs authenticated current versions/watermarks, stale nodes fail closed, and authorization validity is rechecked before disclosure. This does not promise immediate recognition of unseen provider logout/disable; each adapter needs its documented propagation/token-lifetime qualification. Never log tokens or raw claims. No global broker, anonymous business/docs/schema endpoint, or provider-management endpoint is introduced."
+        "description": "Required Authorization: Bearer signed JWT access token on every declared application API operation. Authentication is stateless token verification within the service: no per-request provider/user-info/introspection or session-server round trip. Accept tokens only from explicitly allowlisted region-configured OAuth 2.0 / OpenID Connect providers; Cognito is the initial AWS provider, not an exclusive regional dependency. Browser sign-in uses authorization code + PKCE. The configured provider adapter verifies an allowed signing algorithm and signature with issuer-scoped cached/rotated JWKS, exact issuer, expiry/not-before, access-token purpose, intended API/client binding, subject and required scopes. Conventional providers require the configured API audience in aud. Cognito additionally requires token_use=access and an allowed client_id; validate aud where the configured token profile includes it. Never accept an ID token, a user-ID-only token, a refresh token, or arbitrary identity/group assertions as an API credential. An unverified issuer may select an existing configured verifier only; it must never trigger arbitrary discovery or network access. Map the validated exact issuer+subject pair to an immutable application principal; never auto-link by email. Configured issuer-specific claims may carry bounded coarse scopes, tenant context, persona hints or policy version, but these are normalized inputs to backend authorization, not automatic grants. Unconfigured claims/groups are ignored for authorization. Current trusted service policy decides tenant membership, action/search, record and child-field permissions. Token claims and token expiry alone do not satisfy the documented five-second application-accepted revocation/freshness bound: locally evaluated policy needs authenticated current versions/watermarks, stale nodes fail closed, and authorization validity is rechecked before disclosure. This does not promise immediate recognition of unseen provider logout/disable; each adapter needs its documented propagation/token-lifetime qualification. Never log tokens or raw claims. No global broker, anonymous business/docs/schema endpoint, or provider-management endpoint is introduced. Qualified verifier/callback/key-cache requirements are normative in x-authentication-contract and docs/identity-and-personas.md. Token-provided key URLs/keys are not trust roots."
       }
     },
     "parameters": {
@@ -655,7 +679,7 @@
           "maxLength": 128,
           "pattern": "^[A-Za-z0-9_-]+$"
         },
-        "description": "Opaque random key; never PII. Bound to region, tenant, principal, operation and payload fingerprint for at least 24h. Same request resumes/replays safely; changed payload returns 409. Authorization and erasure state must be rechecked before any replay; never replay stored unfiltered PII after rights change or deletion."
+        "description": "Opaque random key; never PII. Bound to region, tenant, principal, operation and payload fingerprint for at least 24h. Same request resumes/replays safely; changed payload returns 409. Authorization and erasure state must be rechecked before any replay; never replay stored unfiltered PII after rights change or deletion. Preserve one deduplication namespace for the same region/tenant/principal/logical operation across exact API versions; include accepted API-Version and operation/normalization semantics in its fingerprint. Reuse under incompatible contract semantics returns 409 rather than creating a second mutation. State retention and current authorization checks still apply."
       },
       "IfMatch": {
         "name": "If-Match",
@@ -663,7 +687,9 @@
         "required": true,
         "schema": {
           "type": "string",
-          "pattern": "^\"[A-Za-z0-9_-]+\"$"
+          "pattern": "^\"[A-Za-z0-9_-]+\"$",
+          "minLength": 10,
+          "maxLength": 130
         },
         "description": "Required quoted PatientRead.version from the lookup item or ETag from an equivalent single-item response. No wildcard. This is a principal/policy/projection-bound representation/concurrency token, never a bare row revision. Authorize the operation and every affected field first; then compare against the current representation token atomically with mutation. Any stale record revision, policy version or disclosed projection gives 412 without mutation. Missing header gives 428."
       },
@@ -1139,7 +1165,7 @@
             "minLength": 8,
             "maxLength": 128,
             "pattern": "^[A-Za-z0-9_-]+$",
-            "description": "Opaque authenticated representation/concurrency token, not a bare row counter. It binds tenant, patient, principal, current policy version, patient write revision, and authorized detail representation variant. Different disclosed projections MUST produce different tokens. The quote-wrapped token is the strong ETag for that exact detail representation. A lookup item is issued the token for the equivalent single-item detail representation, enabling PATCH without another GET. Tokens cannot be transferred across principals, tenants or policy versions. On each PATCH, authorize first and compare with the current representation token atomically with mutation; any mismatch including policy/projection change is 412."
+            "description": "Opaque authenticated representation/concurrency token, not a bare row counter. It binds tenant, patient, principal, current policy version, patient write revision, and authorized detail representation variant. Different disclosed projections MUST produce different tokens. The quote-wrapped token is the strong ETag for that exact detail representation. A lookup item is issued the token for the equivalent single-item detail representation, enabling PATCH without another GET. Tokens cannot be transferred across principals, tenants or policy versions. On each PATCH, authorize first and compare with the current representation token atomically with mutation; any mismatch including policy/projection change is 412. Bind exact API-Version and all relevant assurance/session/policy inputs; a token from another representation cannot authorize a conditional write."
           },
           "access": {
             "$ref": "#/components/schemas/FieldAccess"
@@ -1358,7 +1384,7 @@
             ]
           }
         ],
-        "description": "Exact base-number matching only, with international/national parsing rules as PhoneInput. Phone is in JSON body, never URL. Repeated pages repeat the same normalized filter. Cursor is opaque authenticated encrypted state or a random server-side handle, bound to tenant, principal, normalized filter, policy version, page size and expiry; never a raw or merely base64-encoded phone. Invalid, expired, mismatched or policy-stale cursors fail with a generic invalid_cursor 400. No cross-tenant, suffix, prefix, fuzzy, or bulk search. countryCode is syntactically mandatory whenever phone does not begin with +; the service additionally rejects malformed numbers, numbering inputs unsupported by its maintained metadata, and ambiguous national input. For input beginning with +, the international number is authoritative and countryCode is not used as the national parsing default. Country is parsing/validation context only and never chooses the residency region."
+        "description": "Exact base-number matching only, with international/national parsing rules as PhoneInput. Phone is in JSON body, never URL. Repeated pages repeat the same normalized filter. Cursor is opaque authenticated encrypted state or a random server-side handle, bound to tenant, principal, normalized filter, policy version, page size and expiry; never a raw or merely base64-encoded phone. Invalid, expired, mismatched or policy-stale cursors fail with a generic invalid_cursor 400. No cross-tenant, suffix, prefix, fuzzy, or bulk search. countryCode is syntactically mandatory whenever phone does not begin with +; the service additionally rejects malformed numbers, numbering inputs unsupported by its maintained metadata, and ambiguous national input. For input beginning with +, the international number is authoritative and countryCode is not used as the national parsing default. Country is parsing/validation context only and never chooses the residency region. Cursor interpretation also binds the exact API-Version, operation, normalization/ordering semantics and cursor codec version; incompatible reuse returns generic invalid_cursor 400."
       },
       "LookupResponse": {
         "type": "object",
@@ -1733,7 +1759,7 @@
     },
     "responses": {
       "BadRequest": {
-        "description": "Only after successful authentication and applicable authorization. Missing/invalid credentials instead return 401 without version negotiation. Malformed JSON, invalid/expired/mismatched cursor, or API-Version negotiation failure. Version errors use stable codes: api_version_invalid (missing, malformed, duplicate or list header value), api_version_path_mismatch (header/path major conflict), api_version_unsupported (well-formed unknown/unpublished exact version). Never default, fall back or echo submitted values. A safely resolved exact version is returned for unrelated errors; unresolved version-negotiation errors omit API-Version.",
+        "description": "Only after successful authentication and applicable authorization. Missing/invalid credentials instead return 401 without version negotiation. Malformed JSON, invalid/expired/mismatched cursor, or API-Version negotiation failure. Version errors use stable codes: api_version_invalid (missing, malformed, duplicate or list header value), api_version_path_mismatch (header/path major conflict), api_version_unsupported (well-formed unknown/unpublished exact version). Never default, fall back or echo submitted values. A safely resolved exact version is returned for unrelated errors; unresolved version-negotiation errors omit API-Version. Strict decoding rejects duplicate decoded JSON names, trailing documents, invalid Unicode and case-mismatched/unknown field ambiguity; duplicate If-Match or Idempotency-Key returns invalid_request. No submitted values are echoed.",
         "headers": {
           "Cache-Control": {
             "$ref": "#/components/headers/NoStore"
@@ -1874,7 +1900,7 @@
         }
       },
       "TooManyRequests": {
-        "description": "Tenant/principal rate limit exceeded.",
+        "description": "Configured principal/session/client, tenant or operation/work budget exceeded. Safe bounded Retry-After guidance; no other tenant activity or raw limiter keys are disclosed.",
         "headers": {
           "Cache-Control": {
             "$ref": "#/components/headers/NoStore"
@@ -1901,7 +1927,7 @@
         }
       },
       "ServiceUnavailable": {
-        "description": "Service unavailable or authorization freshness cannot be guaranteed.",
+        "description": "Service or authoritative authorization state unavailable. With valid credentials but unproven policy freshness, fail closed with safe 503 and no patient values; known revoked credentials use 401, known permission denial uses 403 or concealed 404. Emit API-Version only if safely resolved and X-Policy-Version only if authoritative; never invent freshness. Bounded safe Retry-After guidance may be supplied.",
         "headers": {
           "Cache-Control": {
             "$ref": "#/components/headers/NoStore"
@@ -2022,15 +2048,65 @@
             }
           }
         }
+      },
+      "ContentTooLarge": {
+        "description": "content_too_large: admitted application body exceeds the proposed 131072-byte limit. Edge transport rejection may precede authentication and need not use this application shape.",
+        "headers": {
+          "Cache-Control": {
+            "$ref": "#/components/headers/NoStore"
+          },
+          "X-Policy-Version": {
+            "$ref": "#/components/headers/PolicyVersion"
+          },
+          "X-Request-Id": {
+            "$ref": "#/components/headers/RequestId"
+          },
+          "API-Version": {
+            "$ref": "#/components/headers/ApiVersion"
+          }
+        },
+        "content": {
+          "application/problem+json": {
+            "schema": {
+              "$ref": "#/components/schemas/Problem"
+            }
+          }
+        }
+      },
+      "UnsupportedMediaType": {
+        "description": "unsupported_media_type: admitted body operation requires application/json, absent or UTF-8 charset and no compressed content. Normal application authentication precedes this response.",
+        "headers": {
+          "Cache-Control": {
+            "$ref": "#/components/headers/NoStore"
+          },
+          "X-Policy-Version": {
+            "$ref": "#/components/headers/PolicyVersion"
+          },
+          "X-Request-Id": {
+            "$ref": "#/components/headers/RequestId"
+          },
+          "API-Version": {
+            "$ref": "#/components/headers/ApiVersion"
+          }
+        },
+        "content": {
+          "application/problem+json": {
+            "schema": {
+              "$ref": "#/components/schemas/Problem"
+            }
+          }
+        }
       }
     }
   },
   "x-privacy-contract": {
     "metadata-enforcement": "Application code, policy engine, safe DTO projection and telemetry allowlists must enforce metadata; schema extensions do not enforce it.",
     "field-classification-default": "Deny logging for every new field until explicitly classified and reviewed.",
-    "permission-cache-key": "region + tenant + principal + action + policyVersion; projections also bind record version. Never reuse a raw or filtered user response for another principal.",
+    "permission-cache-key": "Bind every decision input: region/cell, tenant, principal, issuer/client/session/token scope, action, resource identity and authorization-attribute revision, policy version, assurance/purpose/time conditions. Projection reuse additionally binds exact API-Version, resource revision and disclosed field set. Expire at the earliest input validity deadline. Never share raw or filtered responses across authorization contexts; no patient-response cache is introduced.",
     "browser-cache": "no-store responses; no persistent patient cache; in-memory data scoped by tenant/principal/policy and cleared on logout, tenant switch, rights change, and erasure notification.",
-    "erasure-read-barrier": "Approved restricted/purging requests must install a strong read/write deny barrier before reporting restricted; replicas, caches, pending jobs and idempotency replay must honor it. retained is not erased. Restore quarantines and reapplies deletion ledger before traffic resumes."
+    "erasure-read-barrier": "Approved restricted/purging requests must install a strong read/write deny barrier before reporting restricted; replicas, caches, pending jobs and idempotency replay must honor it. retained is not erased. Restore quarantines and reapplies deletion ledger before traffic resumes.",
+    "disclosure-audit": "Freeze the exact response projection and corresponding restricted references/field categories together. Await durable intent acceptance, then recheck authorization/erasure validity and deadline. A changed projection requires a corresponding new intent; never reuse an acknowledgment for changed content.",
+    "telemetry-context": "Generate server request IDs; validate bounded incoming trace context and discard arbitrary baggage/tracestate. Caller sampling flags cannot force unbounded tracing. Never reflect unchecked correlation text into response headers, logs or metrics."
   },
   "x-api-versioning": {
     "policy-document": "docs/api-versioning.md",
@@ -2048,7 +2124,7 @@
     "retirement-headers": "Deprecation, Sunset and Link may be emitted only with authoritative values from the declared support/lifecycle policy. Their concrete Header Object definitions/examples remain a contract follow-up governed by docs/api-versioning.md. Automatic decommissioning follows configured counts and explicit retention pins; no numeric support counts or dates are established by this draft.",
     "telemetry": "Use only configured resolved version identifiers or a finite invalid/unsupported/retired outcome class as bounded metric labels. Never label metrics or log arbitrary raw API-Version values. Version metadata contains no patient values or tenant identity.",
     "tooling-gate": "OpenAPI 3.2.1 validators and Go/client generator compatibility must be selected and verified; no full validation or generated-code compatibility is claimed. No silent downgrade.",
-    "authentication-order": "All declared operations require bearer access-token authentication before API-version negotiation or protected resource semantics. Missing/invalid authentication returns 401 regardless of header/version/resource input; it omits API-Version. Authenticated and appropriately authorized version requests then use the documented 400/410 outcomes. Version selection never grants authorization.",
+    "authentication-order": "All declared operations require bearer access-token authentication before API-version negotiation or protected resource semantics. Missing/invalid authentication returns 401 regardless of header/version/resource input; it omits API-Version. Authenticated and appropriately authorized version requests then use the documented 400/410 outcomes. Version selection never grants authorization. This governs admitted application requests, not edge rejection of unsafe framing, oversized transport or denial-of-service traffic; see x-request-security.",
     "missing-header": "After successful authentication and applicable authorization, omission returns 400 api_version_invalid. Missing or invalid authentication returns 401 first; there is no implicit default version.",
     "exact-selection": "Resolve exactly the published supported version named by the request; never select a newer compatible patch automatically. Response API-Version equals the exact resolved request version. Published contract views are independent of implementation/container build versions; current privacy, erasure and authorization policy remains mandatory for every view.",
     "support-policy": "The declared support set is calculated from configured supported major, minor and patch counts plus explicit version-retention pins under docs/api-versioning.md. Counts and pins are operator policy, not client header aliases. Published versions outside that set are automatically retired and their serving capacity decommissioned. Retain enough lifecycle metadata to return 410 for those known retired versions; never silently reactivate them during an image refresh or downgrade. This design specifies no deployed support configuration or approved numeric counts.",
@@ -2060,13 +2136,14 @@
     "stateless-authentication": "Verify token cryptography/purpose/issuer/API binding locally using trusted configured cached key material. No synchronous provider/user-info/introspection or session-server call on each patient request is required.",
     "coarse-token-context": "Only explicitly configured issuer claim mappings may supply bounded scopes, scoped tenant context, persona hints or policy version. These are untrusted until token validation and never grant access independently. No arbitrary group/role claim becomes an application grant.",
     "authorization-authority": "Each service applies trusted current backend tenant/action/search/record/field policy to the application principal. Application policy state and revocation freshness remain necessary even though token authentication is stateless.",
-    "revocation-bound": "Preserve the documented five-second bound from application acceptance of membership/session/policy revocation. Local policy evaluation requires authenticated authoritative versions/watermarks; stale or unverifiably fresh state fails closed. Carry decision validity through datastore/audit work and recheck before disclosure. Token expiry alone is insufficient. No equivalent bound is claimed for unseen provider-side logout/disable.",
-    "failure-order": "Authenticate first. Missing/invalid access credentials => 401 with fixed WWW-Authenticate: Bearer, no API-Version/policy-version and no protected resource/version semantics. Authenticated and appropriately authorized callers receive normal version/resource outcomes.",
-    "implementation-status": "Documentation/contract requirement only; no provider adapter, runtime enforcement, authorization distributor or session server is implemented by this artifact."
+    "revocation-bound": "Proposed total five-second bound from durable authoritative application commit plus distribution work admission, including publication, delivery, application, clock uncertainty and decision lifetime. Versions/watermarks must prove no missing committed change; a heartbeat alone is insufficient. Unproven fresh policy fails closed. Recheck before side-effect dispatch and disclosure. An already-dispatched remote write may commit later unless an authoritative transaction fence prevents it; cancellation is not proof of noncommit. No equivalent bound applies to unseen provider logout/disable.",
+    "failure-order": "For normally admitted application requests authenticate first. Missing/invalid/revoked access credentials => 401 with fixed Bearer challenge and no API-Version/policy-version. Valid credentials with unavailable/unproven authorization freshness => safe 503; known permissions denial => 403 or concealed 404. Edge framing/size/transport abuse may be rejected before application handling without protected semantics; see x-request-security.",
+    "implementation-status": "Documentation/contract requirement only; no provider adapter, runtime enforcement, authorization distributor or session server is implemented by this artifact.",
+    "qualified-jwt-profile": "Follow docs/identity-and-personas.md: bind accepted algorithms and key types to an exact configured issuer; reject token-supplied jku/x5u/embedded keys as trust sources. Unknown issuer cannot trigger discovery. Bound and coalesce issuer-scoped key refresh, negative-cache misses, define last-trusted-key expiry and outage behavior; never authenticate an unknown key. Qualify callback issuer binding, refresh replay/rotation, logout/session mapping and recent privileged assurance per provider."
   },
   "x-document": {
     "id": "API-CONTRACT-001",
-    "version": "0.2.0",
+    "version": "0.3.0",
     "status": "proposed",
     "approval_status": "pending",
     "authors": [
@@ -2084,9 +2161,24 @@
       "docs/identity-and-personas.md",
       "docs/diagrams.md",
       "docs/events.md",
-      "contracts/asyncapi.json"
+      "contracts/asyncapi.json",
+      "docs/security-review.md"
     ],
     "generation_note": "Canonical design source. Generated exports are documentation snapshots, not runtime-generated schemas or released service contracts.",
     "events_note": "REST bodies retain their declared typed JSON and application/problem+json shapes. Downstream domain events use the separate CloudEvents contract in docs/events.md; that event contract does not introduce a REST envelope, operation or anonymous endpoint. Event semantics and delivery behavior require their own documentation and tests."
+  },
+  "x-request-security": {
+    "status": "Proposed unreleased request profile; needs implementation, edge/Go equivalence, client qualification and human acceptance. These annotations do not enforce it.",
+    "reference": "docs/security-review.md",
+    "max-body-bytes": 131072,
+    "max-json-depth": 16,
+    "max-bearer-credential-bytes": 8192,
+    "max-application-header-bytes": 32768,
+    "limits": "Bound reading time, concurrency and total work in addition to bytes. Qualify HTTP/1.1 and HTTP/2 header accounting and any lower ingress limits before publishing. Schema character limits and transport byte limits both apply.",
+    "body-profile": "Declared body operations require application/json with absent or UTF-8 charset and absent or identity Content-Encoding. Compressed requests and other media types return 415 unsupported_media_type. Declared GET operations accept no body. Oversized application bodies return 413 content_too_large.",
+    "json-decoding": "Exactly one UTF-8 JSON document; reject duplicate decoded property names recursively, invalid UTF-8, unpaired surrogate escapes, trailing documents, nonfinite numbers and unknown or case-mismatched fields. Use the same validated object for authorization and mutation; no last-key-wins or case-insensitive field fallback. Parsing ambiguity returns safe 400 invalid_request; schema/domain validation uses 422.",
+    "header-ambiguity": "One unambiguous bearer credential only; duplicated/ambiguous Authorization => 401. Do not combine duplicate API-Version, If-Match or Idempotency-Key: after authentication, reject safely with 400 (api_version_invalid for API-Version; invalid_request otherwise). Existing absent-header semantics remain unchanged.",
+    "transport-boundary": "Ingress rejects ambiguous HTTP framing, encoded path/separator ambiguity and oversized/slow traffic before application processing. Transport errors may close the connection or lack the application Problem/header shape and never expose protected resource/version semantics. Normally admitted application requests preserve auth-first behavior. Trust forwarding headers only from configured ingress; no client-selected internal destinations.",
+    "abuse-budgets": "Configured per-principal/session/client, tenant, operation/work class and cell rate/concurrency/cost budgets account for reads, retries, audit, transactions and fan-out. Reserve critical recovery capacity. Do not record search values or arbitrary identifiers in metrics; valid tokens alone do not authorize unrestricted enumeration."
   }
 }

@@ -1,6 +1,6 @@
 ---
 id: INDEX-001
-version: 0.2.0
+version: 0.3.0
 status: proposed
 approval_status: pending
 authors: [Codex]
@@ -37,6 +37,7 @@ The project owns the Go service, REST/entity contract, generated consumer-contra
 | [OpenAPI contract](openapi.json) | Current proposed transport/entity definition; not a published API |
 | [Contract examples](examples.json) | Synthetic examples; no real patient information |
 | [Capacity model](capacity-model.md) | Record-growth scenarios and throughput amplification |
+| [Security review](docs/security-review.md) | Threat boundaries, security findings, revised controls and unverified acceptance evidence |
 | [Design review](docs/design-review.md) | Findings, corrections and the limits of current verification |
 | [Open follow-ups](docs/FOLLOWUPS.md) | Proposed values, qualification gates and unresolved ownership |
 

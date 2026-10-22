@@ -1,6 +1,6 @@
 ---
 id: STANDARDS-001
-version: 0.2.0
+version: 0.3.0
 status: proposed
 approval_status: pending
 authors: [Codex]
@@ -82,6 +82,7 @@ Proposed maintenance cadence: review release/support status weekly; qualify rout
 - Generate JSON/YAML OpenAPI exports and schema-derived ERDs from canonical inputs; maintain system and sequence diagrams alongside them. Record provenance and check drift. Generated documentation is not evidence of a deployed implementation.
 - [Image maintenance](image-maintenance.md) defines hardened builder/runtime/test images and refresh provenance. [API testing](api-testing.md) defines required evidence at each layer. A base-image refresh is a new implementation artifact even when API SemVer and service source are unchanged.
 - [Event contracts](events.md) separate OpenAPI REST, AsyncAPI channels/messages and CloudEvents payload envelopes. Event schemas and behavior have their own compatibility lifecycle; an API retirement cannot implicitly retire an event consumer contract.
+- Apply the proposed [security review](security-review.md) controls and finding-to-test matrix. Explicitly qualify strict parsing, bounded abuse work, pooled IAM blast radius, privileged control auditing and incident recovery; do not infer enforcement from schema metadata or container signatures.
 - Fixed patient schema initially. New fields require classification, permissions, example/schema updates and compatibility analysis before introduction.
 - Keep lookup work, retries, queues, batch sizes and deadlines bounded. Service availability and successful-and-fast measurements accompany latency. Fast errors do not satisfy performance requirements.
 

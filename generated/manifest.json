@@ -2,7 +2,7 @@
   "artifact_kind": "design-time documentation export",
   "generated_on": "2026-10-22",
   "canonical_source": "../openapi.json",
-  "source_sha256": "5c11e599971ce556f1e9e29e436e6b7582602f079537042e573d138e2567155e",
+  "source_sha256": "cb30b976fba98ebd685ae26742383a54c57803d0ed58b47ecf3f394637abcb4b",
   "openapi_version": "3.2.1",
   "api_draft_version": "0.1.0",
   "operation_count": 7,
@@ -18,20 +18,21 @@
     "Erasure"
   ],
   "outputs": {
-    "openapi.json": "5c11e599971ce556f1e9e29e436e6b7582602f079537042e573d138e2567155e",
-    "openapi.yaml": "2ee5f2018babe739b28f0fa601fcef8fbecdd8061a19264e544d99989fbd3aba",
-    "asyncapi.json": "82b52bc3a17c10d6f5d9dbcedab36157da4ae1d0249c031e0366cd9e9668a8fa",
-    "asyncapi.yaml": "708cc165f2ca627d593db9e814eba342b208714014341078b82d6b69eb9861fb",
-    "contract-entities.mmd": "4fd289b7ed44d2153b6b45b899607c98bec47140800f1dab6b61370849f54d73",
-    "contract-entities.md": "117da1a3e3d7243145c332a49c420ba581432ace31a8f6b51440cf9f194a5154",
-    "README.md": "040ea434e6073f77a4382a0c1043c66adb83aedffe54a38b4616b56610ebbe91"
+    "openapi.json": "46750ece699a3e88cee82755c82d03b631b5032d545fe920b86423b0c617fcef",
+    "openapi.yaml": "426b79d120d9d07b1ba39dfd5566fe1bc757292063095689c693348e3814d6cd",
+    "asyncapi.json": "642254c512d072fbf01dd7684547efa8cfeeb1c5f72065d3cd93c09f9f5f7d07",
+    "asyncapi.yaml": "a0d4195e3b5dc4318d44be77bf026d5fad0f7eb7ecdeb16dbd7c1612b601b32e",
+    "contract-entities.mmd": "2e4b378d1c2915fc0314ca15055016afd62b94891a09b53639de67d92f5e810c",
+    "contract-entities.md": "74ef698ff9fd7946f6b6ee6f4c8a0b24771487f1cf3b2b3cbd5248af5afcb7f9",
+    "README.md": "6489ee545ea6f042fbe36b9332f705cc0b489084fefe0424070d75c1983b4e58"
   },
   "validation_scope": [
     "JSON parse and local references",
     "JSON/YAML round-trip equality",
     "required bearer security inheritance",
     "schema-subset example checks",
-    "source/output hashes"
+    "source/output hashes",
+    "Mermaid 12.0.0 grammar checks with jsdom 26.1.0, strict security mode; 12 repository sources passed"
   ],
   "not_verified": [
     "full OpenAPI3.2.1 validation",
@@ -42,10 +43,10 @@
     "CloudEvents SDK round-trip and broker delivery"
   ],
   "sources": {
-    "openapi.json": "5c11e599971ce556f1e9e29e436e6b7582602f079537042e573d138e2567155e",
-    "contracts/asyncapi.json": "82b52bc3a17c10d6f5d9dbcedab36157da4ae1d0249c031e0366cd9e9668a8fa",
-    "examples.json": "0b3e981c1dc5a9fa67130952198af90210342412b7066eaea42d3b8af372f4b2",
-    "contracts/event-examples.json": "36b1d98e411d415ca535fe9b2ceca881d009dde68966e2a1859b68f0df01464d"
+    "openapi.json": "cb30b976fba98ebd685ae26742383a54c57803d0ed58b47ecf3f394637abcb4b",
+    "contracts/asyncapi.json": "4cc73974665dfcf8f8dfa6c52fc119896a000e2daba8e58d53736f39f53ac6b9",
+    "examples.json": "4d98bd99384f350cf6c9ddfea3b0a7c4c77d3edfb1d9dfddc9e498cec9496fc6",
+    "contracts/event-examples.json": "e5c01bfc2635b195189f51709e407c7defae9a67129eebd7bdf145aa3bf7558d"
   },
   "asyncapi_version": "3.1.0",
   "asyncapi_draft_version": "0.1.0",

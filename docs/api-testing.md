@@ -1,7 +1,7 @@
 ---
 id: TESTING-001
 title: API testing and release evidence
-version: 0.2.0
+version: 0.3.0
 status: proposed
 approval_status: pending
 authors: [Codex]
@@ -63,6 +63,27 @@ Validate canonical OpenAPI, examples, generated JSON/YAML, schema-derived ERDs a
 ## Event contract evidence
 
 Apply [event contracts](events.md) alongside REST provider/consumer conformance. Validate AsyncAPI references and channel/operation direction, CloudEvents attributes and JSON encoding, event payload schemas and behavior against every declared consumer version. Generated types are supporting evidence, not proof of wire compatibility. Round-trip the actual SQS transport and any optional EventBridge adapter; distinguish the AWS transport envelope from the inner CloudEvent. Test duplicate publication, crash after side effects before acknowledgement, out-of-order revisions, unknown event types, replay, dead-letter recovery and erasure-generation dominance. Prove that neither envelopes, payloads, traces, failure dumps nor AI review artifacts contain contact values or bearer claims. A downstream fetch uses current workload authorization, never the originating user token.
+
+Required adversarial cases also include forged tenant/source/resource/workflow tuples from an otherwise permitted producer; same source/id with changed canonical content; stale retention-decision generations; hold acceptance racing destructive-work admission; callback receipts from old attempts/recovery epochs; and old processed inbox entries restored alongside resurrected data. Exercise provenance retention, poisoned-message quarantine, outbox/inbox recovery and per-tenant/work-class budgets. Merely validating CloudEvents shape or granting SQS SendMessage is not proof of these invariants.
+
+## Security review regression matrix
+
+The [security review](security-review.md) finding IDs are traceability keys for required implementation evidence, not claims that these tests already exist. Use separate low-privilege and attacker identities, real infrastructure where the boundary depends on AWS, and synthetic sentinels only.
+
+| Findings | Required cases and observable outcome |
+|---|---|
+| AUTH-01–02 | Algorithm/key confusion; token-provided key URLs; unknown-kid floods, stale JWKS and issuer outage; callback issuer mix-up; refresh reuse and logout distinctions. No arbitrary fetch, authentication bypass or unbounded key work. |
+| AUTH-03–04 | Missing policy sequence, falsely fresh heartbeat, clock uncertainty, restart, delayed reads/audit, dispatch-versus-commit race, cross-resource/session/assurance cache reuse and denied compound PATCH. Measure the complete proposed five-second bound from durable acceptance. Unproven freshness produces safe 503; no unauthorized disclosure/mutation. |
+| AUTH-05 | Privileged actions without recent qualified assurance, independent approver using the same human identity, indirect self-grant, approval state changed before activation, account recovery and emergency role abuse. All prohibited paths fail and record protected evidence. |
+| DATA-01–06 | Execute the event adversarial cases above plus audit projection freezing: change rights/record/erasure state while SQS acknowledgment is delayed. Never release changed bytes under an old disclosure intent or accept stale completion as current erasure proof. |
+| DATA-07 | Reuse idempotency key across exact API versions with differing semantics: 409, one logical mutation and one deduplication namespace. Cross-version/codec/ordering/normalization cursor reuse gives generic 400 without data or work amplification. |
+| BOUNDARY-01 | Duplicate decoded names including escaped equivalents, case-mismatched fields, invalid UTF-8/unpaired surrogates, trailing JSON, excessive depth/bytes, unsupported/compressed media, duplicate sensitive headers and HTTP framing/path ambiguity across ingress and Go. Same accepted object reaches policy and mutation; 413/415/application-safe errors or pre-admission transport rejection as specified. Test boundary values and largest valid encoded requests too. |
+| BOUNDARY-02 / DATA-05 | One principal/tenant scans many phones or floods expensive pages/retries; queue redrive and poison work compete with audits/erasure. Bound work and cost, preserve critical recovery and other tenants, and report genuine latency/error impact. |
+| BOUNDARY-03 / PLATFORM-02 | Use real workload credentials to attempt foreign cell/environment tables, policy/hold administration, audit archive reads, export/restore, wrong service account, pod exec and node metadata credentials. Verify denied boundaries and explicitly record any accepted shared-cell access. Test key rotation/overlap/recovery without raw key output. |
+| BOUNDARY-04 / PLATFORM-03 | Inject synthetic sensitive values into body, path, query, raw errors, request IDs, baggage/tracestate and sampling flags; inspect application, ALB, WAF logging and sampled requests, SDK, OTel and review artifacts. Test control-audit outage before privilege/hold mutation and backlog expiry protection. |
+| PLATFORM-01,04,05 | Untrusted build overrides/PassRole, poisoned caches/artifacts, substituted attestation, compromised publisher key, revoked digest, stale release registry, AI prompt injection and network/tool exfiltration. No unapproved input obtains signer/deployer authority; image-only policy stops on out-of-policy deltas. |
+
+Do not fulfill this matrix with always-denied mocks. Assert successful authorized cases beside denials; verify tenant/field/error semantics on every supported representation. Security findings remain open until accountable owners review evidence for the actual release/configuration. Independent penetration testing and incident/key/restore exercises are separate launch gates, not replacements for deterministic regression tests.
 
 ## Real dependency integration
 
