@@ -1,0 +1,110 @@
+---
+id: IMAGES-001
+version: 0.2.0
+status: proposed
+approval_status: pending
+authors: [Codex]
+approvers: []
+created: 2026-10-22
+updated: 2026-10-22
+owner_role: Delivery and security owners
+supersedes: []
+superseded_by: []
+references:
+  - ./project-standards.md
+  - ./delivery-and-environments.md
+  - ./api-versioning.md
+  - ./api-testing.md
+---
+
+# Hardened image selection and maintenance
+
+This standard specifies documentation-only requirements for hardened Docker-compatible images and their maintenance on AWS/EKS. It does not create images, workflows, schedules, repositories, cloud resources or deployments. [Project standards](project-standards.md), [delivery](delivery-and-environments.md), [API versioning](api-versioning.md) and [API testing](api-testing.md) remain authoritative for their boundaries. The user has approved the two policy directions below; this document's complete operational specification remains proposed and pending review, with no deployed automation or operational readiness implied.
+
+Decision context: [ADR 0003](../decisions/0003-automate-qualified-image-maintenance.md).
+
+## Approved policy directions and maintenance scope
+
+The user requires hardened images; detection of newly available approved base images; rebuilding, testing and deploying the last approved service version for the affected supported APIs; and exclusion of deployments already pruned by the configured version-support policy. Maintenance creates new immutable images rather than mutating a deployed tag. It must not reactivate a pruned API/deployment or introduce unapproved application changes.
+
+The user has selected these policies:
+
+| Decision | Approved direction | Required boundary |
+|---|---|---|
+| IMAGES-POLICY-01: image-only approval | Automatically rebuild, test and deploy eligible image-only updates under a reviewed standing policy, without per-update human approval | Application/source changes and changes to the standing policy retain human PR approval and independent AI review; the automated lane retains all classification, review, test, signature, canary and lifecycle gates |
+| IMAGES-POLICY-02: version pruning | Use configurable major/minor/patch retention counts plus explicit retained-version overrides to declare the supported set; automatically decommission versions outside that set | Resolve exact count semantics and retention precedence through the API versioning policy; exclude pruned targets from maintenance and never recreate them implicitly |
+
+Version eligibility is count-based. There is no mandatory seven-day idle period, zero-usage prerequisite or new retirement approval for each version that falls outside the declared supported set. Explicit retention overrides keep a version in that set according to the authoritative versioning policy. The image updater consumes the resulting registry and policy generation; it does not invent counts, reorder versions or decide exceptions itself.
+
+The approved image-only lane is automatic even while ordinary application production releases remain in manual-approval mode. This is a narrow standing exception, not activation of automatic application releases. Before enabling the lane, review and record its trusted image families, compatibility/toolchain ranges, permitted input changes, independent AI review/check requirements, promotion thresholds, rollback rules and policy identity. A qualifying maintenance event needs no additional human approval. An event outside those bounds stops and follows ordinary human-reviewed change/release handling.
+
+Image-only eligibility requires an unchanged approved application source commit, dependency lockfiles, build instructions, API contracts, authorization policy and application configuration. Allowed deltas are catalog-qualified builder/runtime/test image digests and only toolchain patch updates explicitly included in the standing policy. Record changed inputs in an immutable maintenance manifest without rewriting the approved service source. Runtime behavior or contract changes cannot bypass API classification, compatibility, testing or ordinary release gates merely because the source commit is unchanged. Changes to modules, source, build scripts, OS/ABI families or toolchains outside the allowed range require normal review. If tracked pin records need an automated update, the protected-repository policy must authorize that exact maintenance change class; it must not create a general bypass for source changes.
+
+## Approved image catalog
+
+Maintain a reviewed catalog for builder, runtime and test images. For each entry record vendor/official distribution, image family and purpose, supported release channel, vendor version, architecture/OS/ABI variant, immutable manifest and platform-image digests, trusted publisher/signature identity, SBOM/provenance source, licensing, support end date, update source, approved compatibility range and accountable owner. Record the verified ECR mirror digest and upstream relationship. Never use a floating `latest` tag as a build input; a moving tag can be a discovery hint only. [Docker image digests](https://docs.docker.com/dhi/explore/security-concepts/digests/).
+
+Select a maintained hardened distribution with evidence of minimal necessary packages, non-root runtime operation, supply-chain provenance, published vulnerability handling and timely supported updates. Builder images may legitimately contain compilers; test images may contain debugging/test tools. Keep those tools out of the runtime unless explicitly required. Verify runtime behavior under the project's pod-security controls, writable-path requirements, certificate trust, DNS, timezone/locale and native-library requirements.
+
+Vendor selection remains open. Docker Hardened Images are one candidate with published hardening and provenance characteristics, not the selected vendor or proof of this service's security. [Docker Hardened Images](https://docs.docker.com/dhi/). An AWS-hosted image, an Amazon Linux image, an ECR repository or a “minimal” label does not automatically satisfy the catalog's hardening requirements. Scanner coverage and required architecture/variant availability are qualification gates.
+
+“Latest” means the newest verified release within the approved family/channel and compatibility bounds that passes qualification. A major OS/toolchain change, `glibc`/`musl` switch, architecture change, entrypoint change, unsupported downgrade or changed cryptographic behavior requires explicit review. When the newest candidate fails, retain the currently approved eligible image, expose the blocked update and escalate the risk; do not silently choose another family or call an old digest current.
+
+## AWS detection and artifact controls
+
+Use trusted upstream release feeds/webhooks or registry metadata, plus ECR/Inspector events, to discover candidates and vulnerability changes. Validate the upstream repository/publisher and immutable digest; arbitrary event text is not authority to execute a build or trust an image. Maintain a persisted discovery watermark and deduplicated work records. EventBridge delivery from ECR is best effort, so use bounded scheduled reconciliation of approved sources as a fallback; a **six-hour maximum polling interval is a proposed operating default** requiring approval, with a tighter incident policy for security advisories. A missed webhook must not mean an image is never examined. [ECR events](https://docs.aws.amazon.com/AmazonECR/latest/userguide/ecr-eventbridge.html).
+
+Mirror qualified base images into restricted ECR repositories so builds do not depend on unreviewed upstream tag movement. Use immutable digests, controlled push permissions, encrypted storage, and auditable source-to-mirror verification. Qualify any mirroring process that transforms a manifest instead of assuming upstream and mirror digests must always match.
+
+Enable ECR enhanced scanning through Amazon Inspector for the relevant repositories and verify coverage, supported OS/language ecosystems, scan completion and the configured rescan window. Pending, failed, unsupported or expired scanning is unknown evidence, not zero vulnerabilities. New Inspector findings can trigger requalification even without a new base release. Complement image scans with application/Go-binary vulnerability analysis; a clean OS package result is not complete service assurance. [ECR enhanced scanning](https://docs.aws.amazon.com/AmazonECR/latest/userguide/image-scanning-enhanced.html).
+
+Use CodePipeline/CodeBuild for controlled rebuild/qualification stages, IAM workload identities, S3 for protected provenance/evidence and CloudWatch for operational status. ECR integrates with AWS Signer for managed or manual image signing; select the supported regional method and verify the expected signer/build identity at promotion and admission. Automatic signing on push does not imply tests passed or a release was approved. Keep test, approved-release and signing trust boundaries distinct. [ECR image signing](https://docs.aws.amazon.com/AmazonECR/latest/userguide/image-signing.html).
+
+## Representation, deployment and source matrix
+
+Do not equate an API representation with a container image or a dedicated deployment. One maintained service image may serve several representations. Keep the following independent registry dimensions:
+
+| Dimension | Required values/evidence |
+|---|---|
+| Contract support | Supported or deprecated-but-supported under the declared count/override policy; or outside that set and decommissioning/retired; policy version and explicit retention overrides |
+| Serving state | Serving in a named target, consolidated into another serving deployment, or dormant/pruned under an explicitly approved policy |
+| Lifecycle identity | Stable target ID, monotonically advancing lifecycle epoch and authoritative support-policy generation; current route/target ownership and reconciliation state |
+| Approved source baseline | Last approved service commit for this release train/target, contract digests, build instructions, toolchain pins, dependency locks and current deployed/approved bundle |
+| Image dependency | Builder/runtime/test family and pinned digests; target architecture; every representation served by the resulting image |
+| Recovery | Approved rollback source/bundle, current image eligibility and any data/policy compatibility exclusions |
+
+The baseline is the last approved service source for that target, not the newest branch head, an unapproved preview commit, or an arbitrarily old binary once used for that API. Share one rebuild across representations that use the same approved source/image set; still test every served representation. An older representation supported through a current compatibility adapter receives that current service build, not a resurrected historical image.
+
+An active supported or deprecated-but-supported representation, including one retained by explicit override, must have a maintained eligible serving implementation. A consolidated deployment is excluded as a separate target, while its representations remain covered through the deployment now serving them. Dormant/pruned targets are excluded from deployment refresh; retired representations remain retired. For a shared deployment serving retained and excluded representations, remove only the excluded routes under the versioning policy and maintain the workload needed by retained representations. A missing implementation for a supported route is an incident, not permission for this job to invent capacity or return a retirement response.
+
+A valid support-set change automatically advances lifecycle intent and decommissions excluded versions according to the versioning policy. Client activity is operational evidence for notices and migration, not an implicit retention override or veto of count-based decommissioning. An incoming request or image update cannot reactivate an excluded version. Reactivation requires an explicit supported-set/retention decision and normal release controls. Stale or unknown support-policy/lifecycle state blocks destructive pruning and promotion until reconciled; usage telemetry alone cannot establish support eligibility. A newly approved retention override cancels pending pruning and supersedes queued maintenance decisions through the lifecycle epoch.
+
+## Maintenance workflow and race protection
+
+1. **Detect and qualify the input.** Resolve a candidate to immutable digests; verify publisher, channel, architecture, hardening and scanner coverage. Record event origin, discovery time, old/new digests and the qualifying policy version.
+2. **Select only eligible targets.** Read the support/serving/source matrix and lifecycle epoch. Create an idempotent job keyed by target or shared build group, approved source commit, candidate image/toolchain set and policy version. Record skipped pruned/retired targets with a reason. No queued job is an unconditional future deployment instruction.
+3. **Recheck at build start.** Compare the current target epoch, approved source baseline and route mapping with the selection snapshot. Superseded jobs stop or recompute through qualification; they do not revive an old target. A newer approved source supersedes rebuilding the former baseline for forward deployment.
+4. **Rebuild the exact approved service.** Preserve application source, dependency lockfiles and build instructions. Supply only catalog-qualified image overrides and toolchain patch updates explicitly covered by the standing policy; record all inputs in provenance without rewriting the historical service commit. Do not add dependency upgrades, feature changes or current-main code. Any delta outside the approved image-only class uses the normal human and AI source-review process. Verify the exact allowed input delta before any automated pin-record update or promotion.
+5. **Verify and publish a candidate.** Produce new immutable image digests/build IDs, SBOMs, source/build-input provenance, signature evidence and test results. Preserve the API contract SemVer only when contract and behavior remain unchanged; a new image digest is not automatically an API patch. An image-only build does not create an API version, change version ordering, consume a retention slot or revive an excluded representation. If observable behavior changes, apply the ordinary version-classification/release process.
+6. **Validate in an isolated preview environment.** Use the preview AWS account and a dedicated release-validation namespace/cluster for an older production-approved baseline. Do not overwrite the stable shared preview, which follows the newest passing main generation, with older service source. Shared preview may accept a maintenance refresh only for its own currently selected source under its deployment-generation guard.
+7. **Recheck immediately before promotion.** Use a conditional lifecycle-epoch/source-baseline check under the same serialized promotion control as normal releases. If pruning, retirement, a route change, a new approved baseline or a policy change won the race, cancel/re-evaluate. The check and activation must be fenced together so a later stale deploy cannot recreate a target. Stop or revoke an in-progress rollout when lifecycle ownership changes; reconciliation enforces the newest intent.
+8. **Promote through the approved lane.** An eligible image-only candidate automatically enters production canary under the standing maintenance policy, even while ordinary application releases require manual approval. It needs no per-event human approval, but must satisfy independent review/checks, provenance, full test coverage, current lifecycle eligibility, canary and recovery gates. Candidates requiring application changes or an out-of-policy input follow the ordinary application release mode. Canary the same digest tested in preview, then complete the eligible targets. An image push, signature or scan by itself is insufficient authority.
+9. **Record and reconcile.** Append immutable qualification/promotion attestations linked to the build manifest, update the approved digest/source/epoch mapping conditionally, and reconcile desired versus actual deployed digests. Record duplicate, superseded, skipped, failed and successful jobs distinctly. Never mutate a previously signed build manifest to add later outcomes.
+
+For Go, replacing the runtime base alone does not patch code compiled into the service binary. A Go standard-library/compiler security fix requires rebuilding with a qualified patched Go toolchain; a vulnerable module requires an explicitly reviewed dependency change. Examine the actual binary and its build information, not only OS layers. If the approved source cannot build safely with the required supported toolchain, report the blocker and use the normal remediation process rather than silently changing source or declaring the runtime refresh complete. [Go security guidance](https://go.dev/doc/security/best-practices).
+
+## Test, canary and rollback gates
+
+Apply [API testing](api-testing.md) to every supported representation carried by the candidate, not only the newest route. Include generated/provider/consumer conformance, strict response shapes and error semantics, token/provider validation, tenant/row/field restrictions, redaction, erasure/tombstones, cursor/idempotency behavior and cross-version rolling compatibility. Exercise runtime-specific certificate/DNS/timezone/native-library behavior and every deployed CPU architecture. Scan the resulting service image and binary, verify provenance/SBOM changes, and prove the permitted input delta matches the maintenance classification.
+
+Use synthetic fixtures only. No patient datasets, token dumps or production payloads enter CI, image metadata, AI review, scanner attachments or build logs. Readiness alone is not acceptance: retain the joint browser-visible performance gate and relevant 20k-RPS capacity evidence, including strongly consistent reads, audit acknowledgements, retries and hot keys. A base/toolchain change can affect latency, memory or startup even when API SemVer is unchanged.
+
+Canary policy checks successful-and-fast ratio, errors/timeouts, browser/API latency, authentication denials, safe telemetry, audit failures/backlog, DynamoDB throttling/retries, pod restarts and resource pressure. Missing evidence pauses promotion. Thresholds/sample requirements are approved delivery policy, not invented by the image updater.
+
+Refresh the approved rollback inventory as well as forward eligibility. Where a rollback source remains authorized for current supported representations, qualify a patched image for it offline without activating any route or capacity. Mark vulnerable, revoked, incompatible or unverified rollback images ineligible; never delete the only safe recovery artifact merely to clean the registry. If no safe rollback remains, block automatic promotion and obtain the explicit recovery decision defined by delivery policy. Rollback must preserve current authorization and erasure state and cannot reactivate a pruned/retired deployment. ECR cleanup must retain required signatures, provenance and eligible recovery artifacts.
+
+## Evidence, alerts and adoption
+
+Maintain a protected audit trail with candidate/upstream/mirror/service digests, source commit, input overrides, policy and lifecycle epochs, target/representation mapping, scan/SBOM/signature results, test evidence, approvals, canary outcome, skip reason and final deployment state. Image digests and run IDs belong in deployment records, not unbounded metric label sets. CloudWatch metrics use bounded image-family/environment/result classes and alert on discovery gaps, scanner coverage expiry, qualification failures, stalled approvals, unsupported bases, rollout failures, drift, and unresolved recovery gaps.
+
+Before operational adoption, select and qualify hardened-image vendors/families, record the reviewed standing-policy bounds and operating intervals, consume the declared count-based supported set and retention overrides, map the last-approved source for every serving target, configure scanner/signature trust, and demonstrate missed-event recovery, duplicate delivery, failed qualification, pruning/promotion races, same-digest promotion, safe rollback and non-reactivation of pruned targets. The user's policy selections above are recorded; implementation and operational readiness remain unverified, with no deployed image-maintenance automation.

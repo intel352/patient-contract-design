@@ -1,0 +1,167 @@
+{
+  "description": "Synthetic documentation fixtures for contracts/asyncapi.json; not execution or broker-delivery evidence. EventBridge example is optional adapter format, not baseline SQS wire format.",
+  "asyncapiContract": "asyncapi.json",
+  "examples": [
+    {
+      "message": "PatientCreated",
+      "channel": "domainEvents",
+      "payload": {
+        "specversion": "1.0",
+        "id": "00000000-0000-4000-8000-000000000001",
+        "source": "urn:patient-contact:preview:us-east-1:cell-example:domain",
+        "type": "patientcontact.patient.created.v1",
+        "time": "2026-10-22T15:00:01Z",
+        "datacontenttype": "application/json",
+        "dataschema": "urn:patient-contact:event-schema:patient.created:1.0.0",
+        "tenantid": "tenant_synthetic_0001",
+        "data": {
+          "patientId": "pat_synthetic_0001",
+          "recordRevision": 1,
+          "accessGeneration": 0,
+          "deletionGeneration": 0
+        }
+      }
+    },
+    {
+      "message": "PatientUpdated",
+      "channel": "domainEvents",
+      "payload": {
+        "specversion": "1.0",
+        "id": "00000000-0000-4000-8000-000000000002",
+        "source": "urn:patient-contact:preview:us-east-1:cell-example:domain",
+        "type": "patientcontact.patient.updated.v1",
+        "time": "2026-10-22T15:00:02Z",
+        "datacontenttype": "application/json",
+        "dataschema": "urn:patient-contact:event-schema:patient.updated:1.0.0",
+        "tenantid": "tenant_synthetic_0001",
+        "data": {
+          "patientId": "pat_synthetic_0001",
+          "recordRevision": 2,
+          "accessGeneration": 0,
+          "deletionGeneration": 0
+        }
+      }
+    },
+    {
+      "message": "PatientRestricted",
+      "channel": "domainEvents",
+      "payload": {
+        "specversion": "1.0",
+        "id": "00000000-0000-4000-8000-000000000003",
+        "source": "urn:patient-contact:preview:us-east-1:cell-example:domain",
+        "type": "patientcontact.patient.restricted.v1",
+        "time": "2026-10-22T15:00:03Z",
+        "datacontenttype": "application/json",
+        "dataschema": "urn:patient-contact:event-schema:patient.restricted:1.0.0",
+        "tenantid": "tenant_synthetic_0001",
+        "data": {
+          "patientId": "pat_synthetic_0001",
+          "recordRevision": 3,
+          "accessGeneration": 1,
+          "deletionGeneration": 0,
+          "restrictionPolicyVersion": "policy_synthetic_0002"
+        }
+      }
+    },
+    {
+      "message": "PatientErasureStarted",
+      "channel": "domainEvents",
+      "payload": {
+        "specversion": "1.0",
+        "id": "00000000-0000-4000-8000-000000000006",
+        "source": "urn:patient-contact:preview:us-east-1:cell-example:domain",
+        "type": "patientcontact.patient.erasure.started.v1",
+        "time": "2026-10-22T15:00:03.500Z",
+        "datacontenttype": "application/json",
+        "dataschema": "urn:patient-contact:event-schema:patient.erasure.started:1.0.0",
+        "tenantid": "tenant_synthetic_0001",
+        "data": {
+          "patientId": "pat_synthetic_0001",
+          "recordRevision": 4,
+          "accessGeneration": 1,
+          "deletionGeneration": 1,
+          "erasureRequestId": "erase_synthetic_0001"
+        }
+      }
+    },
+    {
+      "message": "PatientErasureCompleted",
+      "channel": "domainEvents",
+      "payload": {
+        "specversion": "1.0",
+        "id": "00000000-0000-4000-8000-000000000004",
+        "source": "urn:patient-contact:preview:us-east-1:cell-example:domain",
+        "type": "patientcontact.patient.erasure.completed.v1",
+        "time": "2026-10-22T15:00:04Z",
+        "datacontenttype": "application/json",
+        "dataschema": "urn:patient-contact:event-schema:patient.erasure.completed:1.0.0",
+        "tenantid": "tenant_synthetic_0001",
+        "data": {
+          "patientId": "pat_synthetic_0001",
+          "recordRevision": 5,
+          "accessGeneration": 1,
+          "deletionGeneration": 1,
+          "erasureRequestId": "erase_synthetic_0001",
+          "completionEvidenceRef": "proof_synthetic_0001"
+        }
+      }
+    },
+    {
+      "message": "AuditDisclosureIntent",
+      "channel": "auditIntents",
+      "payload": {
+        "specversion": "1.0",
+        "id": "00000000-0000-4000-8000-000000000005",
+        "source": "urn:patient-contact:preview:us-east-1:cell-example:audit",
+        "type": "patientcontact.audit.disclosure.intent.v1",
+        "time": "2026-10-22T15:00:05Z",
+        "datacontenttype": "application/json",
+        "dataschema": "urn:patient-contact:event-schema:audit.disclosure.intent:1.0.0",
+        "tenantid": "tenant_synthetic_0001",
+        "data": {
+          "actorRef": "principal_synthetic_0001",
+          "requestId": "request_synthetic_0001",
+          "operation": "patients.read",
+          "decision": "authorized_disclosure_intent",
+          "policyVersion": "policy_synthetic_0001",
+          "disclosures": [
+            {
+              "patientId": "pat_synthetic_0002",
+              "recordRevision": 1,
+              "fieldCategories": [
+                "name",
+                "name.display"
+              ]
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "optionalEventBridgeDelivery": {
+    "version": "0",
+    "id": "10000000-0000-4000-8000-000000000001",
+    "source": "patientcontact.domain",
+    "detail-type": "patientcontact.patient.created.v1",
+    "account": "000000000000",
+    "time": "2026-10-22T15:00:02Z",
+    "region": "us-east-1",
+    "resources": [],
+    "detail": {
+      "specversion": "1.0",
+      "id": "00000000-0000-4000-8000-000000000001",
+      "source": "urn:patient-contact:preview:us-east-1:cell-example:domain",
+      "type": "patientcontact.patient.created.v1",
+      "time": "2026-10-22T15:00:01Z",
+      "datacontenttype": "application/json",
+      "dataschema": "urn:patient-contact:event-schema:patient.created:1.0.0",
+      "tenantid": "tenant_synthetic_0001",
+      "data": {
+        "patientId": "pat_synthetic_0001",
+        "recordRevision": 1,
+        "accessGeneration": 0,
+        "deletionGeneration": 0
+      }
+    }
+  }
+}

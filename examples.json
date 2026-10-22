@@ -1,0 +1,199 @@
+{
+  "lookupRequest": {
+    "schema": "LookupRequest",
+    "value": {
+      "phone": "202-555-0142",
+      "countryCode": "US",
+      "limit": 10
+    }
+  },
+  "lookupInternationalRequest": {
+    "schema": "LookupRequest",
+    "value": {
+      "phone": "+12025550142",
+      "limit": 10
+    }
+  },
+  "lookupResponse": {
+    "schema": "LookupResponse",
+    "value": {
+      "items": [
+        {
+          "patientId": "pt_example01",
+          "version": "v_example01",
+          "access": {
+            "readableFields": [
+              "name",
+              "name.display",
+              "phones",
+              "phones[].e164",
+              "address",
+              "address.countryCode",
+              "address.lines",
+              "address.locality",
+              "address.administrativeArea",
+              "address.postalCode"
+            ],
+            "writableFields": [
+              "address",
+              "address.locality"
+            ],
+            "policyVersion": "pv_example01"
+          },
+          "name": {
+            "display": "Synthetic Patient"
+          },
+          "phones": [
+            {
+              "e164": "+12025550142"
+            }
+          ],
+          "address": null
+        }
+      ],
+      "nextCursor": null
+    }
+  },
+  "createRequest": {
+    "schema": "PatientCreate",
+    "value": {
+      "name": {
+        "display": "Synthetic Patient"
+      },
+      "phones": [
+        {
+          "phone": "+12025550142"
+        }
+      ],
+      "comment": null
+    }
+  },
+  "patchClearComment": {
+    "schema": "PatientPatch",
+    "value": {
+      "comment": null
+    }
+  },
+  "erasureRequest": {
+    "schema": "ErasureCreate",
+    "value": {
+      "patientId": "pt_example01",
+      "reasonCode": "subject_request"
+    }
+  },
+  "erasurePendingBackup": {
+    "schema": "Erasure",
+    "value": {
+      "requestId": "er_example01",
+      "status": "backup_expiry_pending",
+      "backupExpiryAt": "2026-11-26T00:00:00Z",
+      "updatedAt": "2026-10-22T16:00:00Z"
+    }
+  },
+  "problem": {
+    "schema": "Problem",
+    "value": {
+      "type": "https://api.example.invalid/problems/field-forbidden",
+      "title": "Operation not permitted",
+      "status": 403,
+      "code": "field_forbidden",
+      "requestId": "rq_example01"
+    }
+  },
+  "session": {
+    "schema": "Session",
+    "value": {
+      "subjectId": "prn_example01",
+      "memberships": [
+        {
+          "tenantId": "ten_example01",
+          "residencyRegion": "us-east-1",
+          "apiBaseUrl": "https://us.api.example.invalid",
+          "capabilities": [
+            "patients.lookup.phone",
+            "patients.read"
+          ]
+        }
+      ],
+      "nextCursor": null
+    }
+  },
+  "patchCityOnly": {
+    "schema": "PatientPatch",
+    "value": {
+      "address": {
+        "locality": "Example City"
+      }
+    }
+  },
+  "patchClearPhones": {
+    "schema": "PatientPatch",
+    "value": {
+      "phones": []
+    }
+  },
+  "patchClearPhonesNull": {
+    "schema": "PatientPatch",
+    "value": {
+      "phones": null
+    }
+  },
+  "apiVersionRequest": {
+    "schema": "ApiVersionPatch",
+    "value": "1.0.0"
+  },
+  "apiVersionResponse": {
+    "schema": "ApiVersionPatch",
+    "value": "1.0.0"
+  },
+  "api_version_invalid": {
+    "schema": "Problem",
+    "value": {
+      "type": "https://api.example.invalid/problems/api-version-invalid",
+      "title": "Invalid API version",
+      "status": 400,
+      "code": "api_version_invalid",
+      "requestId": "rq_example01"
+    }
+  },
+  "api_version_path_mismatch": {
+    "schema": "Problem",
+    "value": {
+      "type": "https://api.example.invalid/problems/api-version-path-mismatch",
+      "title": "API version conflicts with path",
+      "status": 400,
+      "code": "api_version_path_mismatch",
+      "requestId": "rq_example01"
+    }
+  },
+  "api_version_unsupported": {
+    "schema": "Problem",
+    "value": {
+      "type": "https://api.example.invalid/problems/api-version-unsupported",
+      "title": "Unsupported API version",
+      "status": 400,
+      "code": "api_version_unsupported",
+      "requestId": "rq_example01"
+    }
+  },
+  "api_version_retired": {
+    "schema": "Problem",
+    "value": {
+      "type": "https://api.example.invalid/problems/api-version-retired",
+      "title": "API version retired",
+      "status": 410,
+      "code": "api_version_retired",
+      "requestId": "rq_example01"
+    }
+  },
+  "authenticationRequired": {
+    "schema": "Problem",
+    "value": {
+      "type": "https://api.example.invalid/problems/authentication-required",
+      "title": "Authentication required",
+      "status": 401,
+      "code": "authentication_required",
+      "requestId": "rq_example01"
+    }
+  }
+}

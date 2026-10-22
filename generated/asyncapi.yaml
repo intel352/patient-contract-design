@@ -1,0 +1,862 @@
+---
+asyncapi: 3.1.0
+id: urn:patient-contact:application:regional-publishers
+info:
+  title: Patient Contact regional event publishers
+  version: 0.1.0
+  description: Unreleased documentation-only proposal for the patient service publishing
+    boundary, including API audit producer and transactional-outbox relay. Operations
+    are from this publisher application perspective. Workers are separate receiving
+    applications; their own operations/queue mappings must be qualified, not inferred
+    by flipping send to receive. Event payloads proposed as v1/1.0.0 are not released
+    contracts. See ../docs/events.md.
+defaultContentType: application/cloudevents+json
+servers:
+  regionalSqs:
+    host: sqs.{region}.amazonaws.com
+    protocol: sqs
+    description: Illustrative commercial-AWS regional SQS endpoint, accessed using
+      TLS/SigV4 and IAM workload identity. Region/cell/account ownership is backend
+      controlled; AWS China requires separate deployment qualification. Defaults are
+      synthetic examples, not selected launch placement.
+    variables:
+      region:
+        default: us-east-1
+        description: Qualified AWS deployment region, never chosen by event input.
+    x-aws-authentication:
+      signing: AWS Signature Version 4
+      credentials: short-lived workload identity
+      authorization: least-privilege queue and KMS policies; separate domain and audit
+        roles
+channels:
+  domainEvents:
+    address: patient-contact-domain-events
+    description: One regional cell/environment queue with competing replicas of one
+      domain-worker application; independent subscribers require distinct queues/fanout.
+    servers:
+    - "$ref": "#/servers/regionalSqs"
+    messages:
+      PatientCreated:
+        "$ref": "#/components/messages/PatientCreated"
+      PatientUpdated:
+        "$ref": "#/components/messages/PatientUpdated"
+      PatientRestricted:
+        "$ref": "#/components/messages/PatientRestricted"
+      PatientErasureCompleted:
+        "$ref": "#/components/messages/PatientErasureCompleted"
+      PatientErasureStarted:
+        "$ref": "#/components/messages/PatientErasureStarted"
+    bindings:
+      sqs:
+        bindingVersion: 0.3.0
+        queue:
+          name: patient-contact-domain-events
+          fifoQueue: false
+    x-address-resolution: Logical queue name; deployment inventory resolves the actual
+      account, cell, environment, queue URL/ARN, KMS key and DLQ. No cloud resource
+      is created by this document.
+  auditIntents:
+    address: patient-contact-audit-intents
+    description: Separate restricted regional audit queue; durable acceptance is required
+      before disclosure. Audit archive worker is independently authorized.
+    servers:
+    - "$ref": "#/servers/regionalSqs"
+    messages:
+      AuditDisclosureIntent:
+        "$ref": "#/components/messages/AuditDisclosureIntent"
+    bindings:
+      sqs:
+        bindingVersion: 0.3.0
+        queue:
+          name: patient-contact-audit-intents
+          fifoQueue: false
+    x-address-resolution: Logical queue name; deployment inventory resolves the actual
+      account, cell, environment, queue URL/ARN, KMS key and DLQ. No cloud resource
+      is created by this document.
+operations:
+  publishDomainEvents:
+    action: send
+    title: Durable outbox relay publishes committed domain events
+    channel:
+      "$ref": "#/channels/domainEvents"
+    messages:
+    - "$ref": "#/channels/domainEvents/messages/PatientCreated"
+    - "$ref": "#/channels/domainEvents/messages/PatientUpdated"
+    - "$ref": "#/channels/domainEvents/messages/PatientRestricted"
+    - "$ref": "#/channels/domainEvents/messages/PatientErasureCompleted"
+    - "$ref": "#/channels/domainEvents/messages/PatientErasureStarted"
+    x-delivery-semantics: at-least-once; duplicates and out-of-order delivery possible
+    x-authorization: AWS SigV4 using a scoped workload identity and queue/KMS policies.
+      No end-user JWT is placed in a message.
+  publishDisclosureIntent:
+    action: send
+    title: API durably publishes authorized disclosure intent before returning protected
+      data
+    channel:
+      "$ref": "#/channels/auditIntents"
+    messages:
+    - "$ref": "#/channels/auditIntents/messages/AuditDisclosureIntent"
+    x-delivery-semantics: at-least-once; duplicates and out-of-order delivery possible
+    x-authorization: AWS SigV4 using a scoped workload identity and queue/KMS policies.
+      No end-user JWT is placed in a message.
+components:
+  messages:
+    PatientCreated:
+      name: PatientCreated
+      title: patient.created v1
+      summary: Reference-only patient.created event.
+      contentType: application/cloudevents+json
+      payload:
+        "$ref": "#/components/schemas/PatientCreatedEvent"
+      x-data-classification: restricted-linkable-event
+      x-log-policy: deny-payload
+      x-event-schema-version: 1.0.0
+      examples:
+      - name: syntheticPatientCreated
+        summary: Fictional references only; documentation fixture, not an observed
+          execution.
+        payload:
+          specversion: '1.0'
+          id: 00000000-0000-4000-8000-000000000001
+          source: urn:patient-contact:preview:us-east-1:cell-example:domain
+          type: patientcontact.patient.created.v1
+          time: '2026-10-22T15:00:01Z'
+          datacontenttype: application/json
+          dataschema: urn:patient-contact:event-schema:patient.created:1.0.0
+          tenantid: tenant_synthetic_0001
+          data:
+            patientId: pat_synthetic_0001
+            recordRevision: 1
+            accessGeneration: 0
+            deletionGeneration: 0
+    PatientUpdated:
+      name: PatientUpdated
+      title: patient.updated v1
+      summary: Reference-only patient.updated event.
+      contentType: application/cloudevents+json
+      payload:
+        "$ref": "#/components/schemas/PatientUpdatedEvent"
+      x-data-classification: restricted-linkable-event
+      x-log-policy: deny-payload
+      x-event-schema-version: 1.0.0
+      examples:
+      - name: syntheticPatientUpdated
+        summary: Fictional references only; documentation fixture, not an observed
+          execution.
+        payload:
+          specversion: '1.0'
+          id: 00000000-0000-4000-8000-000000000002
+          source: urn:patient-contact:preview:us-east-1:cell-example:domain
+          type: patientcontact.patient.updated.v1
+          time: '2026-10-22T15:00:02Z'
+          datacontenttype: application/json
+          dataschema: urn:patient-contact:event-schema:patient.updated:1.0.0
+          tenantid: tenant_synthetic_0001
+          data:
+            patientId: pat_synthetic_0001
+            recordRevision: 2
+            accessGeneration: 0
+            deletionGeneration: 0
+    PatientRestricted:
+      name: PatientRestricted
+      title: patient.restricted v1
+      summary: Reference-only patient.restricted event.
+      contentType: application/cloudevents+json
+      payload:
+        "$ref": "#/components/schemas/PatientRestrictedEvent"
+      x-data-classification: restricted-linkable-event
+      x-log-policy: deny-payload
+      x-event-schema-version: 1.0.0
+      examples:
+      - name: syntheticPatientRestricted
+        summary: Fictional references only; documentation fixture, not an observed
+          execution.
+        payload:
+          specversion: '1.0'
+          id: 00000000-0000-4000-8000-000000000003
+          source: urn:patient-contact:preview:us-east-1:cell-example:domain
+          type: patientcontact.patient.restricted.v1
+          time: '2026-10-22T15:00:03Z'
+          datacontenttype: application/json
+          dataschema: urn:patient-contact:event-schema:patient.restricted:1.0.0
+          tenantid: tenant_synthetic_0001
+          data:
+            patientId: pat_synthetic_0001
+            recordRevision: 3
+            accessGeneration: 1
+            deletionGeneration: 0
+            restrictionPolicyVersion: policy_synthetic_0002
+    PatientErasureCompleted:
+      name: PatientErasureCompleted
+      title: patient.erasure.completed v1
+      summary: Reference-only patient.erasure.completed event.
+      contentType: application/cloudevents+json
+      payload:
+        "$ref": "#/components/schemas/PatientErasureCompletedEvent"
+      x-data-classification: restricted-linkable-event
+      x-log-policy: deny-payload
+      x-event-schema-version: 1.0.0
+      examples:
+      - name: syntheticPatientErasureCompleted
+        summary: Fictional references only; documentation fixture, not an observed
+          execution.
+        payload:
+          specversion: '1.0'
+          id: 00000000-0000-4000-8000-000000000004
+          source: urn:patient-contact:preview:us-east-1:cell-example:domain
+          type: patientcontact.patient.erasure.completed.v1
+          time: '2026-10-22T15:00:04Z'
+          datacontenttype: application/json
+          dataschema: urn:patient-contact:event-schema:patient.erasure.completed:1.0.0
+          tenantid: tenant_synthetic_0001
+          data:
+            patientId: pat_synthetic_0001
+            recordRevision: 5
+            accessGeneration: 1
+            deletionGeneration: 1
+            erasureRequestId: erase_synthetic_0001
+            completionEvidenceRef: proof_synthetic_0001
+    AuditDisclosureIntent:
+      name: AuditDisclosureIntent
+      title: audit.disclosure.intent v1
+      summary: Reference-only audit.disclosure.intent event.
+      contentType: application/cloudevents+json
+      payload:
+        "$ref": "#/components/schemas/AuditDisclosureIntentEvent"
+      x-data-classification: restricted-linkable-event
+      x-log-policy: deny-payload
+      x-event-schema-version: 1.0.0
+      examples:
+      - name: syntheticAuditDisclosureIntent
+        summary: Fictional references only; documentation fixture, not an observed
+          execution.
+        payload:
+          specversion: '1.0'
+          id: 00000000-0000-4000-8000-000000000005
+          source: urn:patient-contact:preview:us-east-1:cell-example:audit
+          type: patientcontact.audit.disclosure.intent.v1
+          time: '2026-10-22T15:00:05Z'
+          datacontenttype: application/json
+          dataschema: urn:patient-contact:event-schema:audit.disclosure.intent:1.0.0
+          tenantid: tenant_synthetic_0001
+          data:
+            actorRef: principal_synthetic_0001
+            requestId: request_synthetic_0001
+            operation: patients.read
+            decision: authorized_disclosure_intent
+            policyVersion: policy_synthetic_0001
+            disclosures:
+            - patientId: pat_synthetic_0002
+              recordRevision: 1
+              fieldCategories:
+              - name
+              - name.display
+    PatientErasureStarted:
+      name: PatientErasureStarted
+      title: patient.erasure.started v1
+      summary: Reference-only approved erasure-start fact for the authorized handler.
+      contentType: application/cloudevents+json
+      payload:
+        "$ref": "#/components/schemas/PatientErasureStartedEvent"
+      x-data-classification: restricted-linkable-event
+      x-log-policy: deny-payload
+      x-event-schema-version: 1.0.0
+      examples:
+      - name: syntheticPatientErasureStarted
+        summary: Fictional references only; documentation fixture, not an observed
+          execution.
+        payload:
+          specversion: '1.0'
+          id: 00000000-0000-4000-8000-000000000006
+          source: urn:patient-contact:preview:us-east-1:cell-example:domain
+          type: patientcontact.patient.erasure.started.v1
+          time: '2026-10-22T15:00:03.500Z'
+          datacontenttype: application/json
+          dataschema: urn:patient-contact:event-schema:patient.erasure.started:1.0.0
+          tenantid: tenant_synthetic_0001
+          data:
+            patientId: pat_synthetic_0001
+            recordRevision: 4
+            accessGeneration: 1
+            deletionGeneration: 1
+            erasureRequestId: erase_synthetic_0001
+  schemas:
+    OpaqueReference:
+      type: string
+      minLength: 8
+      maxLength: 128
+      pattern: "^[A-Za-z0-9_-]+$"
+      description: Restricted, linkable opaque reference. No patient values, raw identity-provider
+        subjects, credentials or phone hashes. Not a telemetry label.
+    Sequence:
+      type: integer
+      minimum: 0
+      maximum: 9007199254740991
+    PatientChangeData:
+      type: object
+      additionalProperties: false
+      properties:
+        patientId:
+          "$ref": "#/components/schemas/OpaqueReference"
+        recordRevision:
+          type: integer
+          minimum: 1
+          maximum: 9007199254740991
+          description: Monotonic internal patient aggregate revision, committed with
+            the mutation. Not the principal-bound REST ETag.
+        accessGeneration:
+          type: integer
+          minimum: 0
+          maximum: 9007199254740991
+          description: Monotonic patient restriction generation. Consumers cannot
+            reset restrictions from an older or ordinary update event.
+        deletionGeneration:
+          type: integer
+          minimum: 0
+          maximum: 9007199254740991
+          description: Monotonic erasure generation; a positive tombstone dominates
+            all non-erasure events for this immutable patient ID.
+      required:
+      - patientId
+      - recordRevision
+      - accessGeneration
+      - deletionGeneration
+      description: Reference-only mutation notification. An authorized consumer resolves
+        current authoritative state; no patient snapshot or changed values are published.
+    PatientRestrictedData:
+      type: object
+      additionalProperties: false
+      properties:
+        patientId:
+          "$ref": "#/components/schemas/OpaqueReference"
+        recordRevision:
+          type: integer
+          minimum: 1
+          maximum: 9007199254740991
+          description: Monotonic internal patient aggregate revision, committed with
+            the mutation. Not the principal-bound REST ETag.
+        accessGeneration:
+          type: integer
+          minimum: 1
+          maximum: 9007199254740991
+          description: Monotonic patient restriction generation. Consumers cannot
+            reset restrictions from an older or ordinary update event.
+        deletionGeneration:
+          type: integer
+          minimum: 0
+          maximum: 9007199254740991
+          description: Monotonic erasure generation; a positive tombstone dominates
+            all non-erasure events for this immutable patient ID.
+        restrictionPolicyVersion:
+          "$ref": "#/components/schemas/OpaqueReference"
+      required:
+      - patientId
+      - recordRevision
+      - accessGeneration
+      - deletionGeneration
+      - restrictionPolicyVersion
+      description: Restriction notification; the restriction and revision are already
+        committed. Not a permission grant or the sole revocation freshness mechanism.
+    ErasureCompletedData:
+      type: object
+      additionalProperties: false
+      properties:
+        patientId:
+          "$ref": "#/components/schemas/OpaqueReference"
+        recordRevision:
+          type: integer
+          minimum: 1
+          maximum: 9007199254740991
+          description: Monotonic internal patient aggregate revision, committed with
+            the mutation. Not the principal-bound REST ETag.
+        accessGeneration:
+          type: integer
+          minimum: 0
+          maximum: 9007199254740991
+          description: Monotonic patient restriction generation. Consumers cannot
+            reset restrictions from an older or ordinary update event.
+        deletionGeneration:
+          type: integer
+          minimum: 1
+          maximum: 9007199254740991
+          description: Monotonic erasure generation; a positive tombstone dominates
+            all non-erasure events for this immutable patient ID.
+        erasureRequestId:
+          "$ref": "#/components/schemas/OpaqueReference"
+        completionEvidenceRef:
+          "$ref": "#/components/schemas/OpaqueReference"
+      required:
+      - patientId
+      - recordRevision
+      - accessGeneration
+      - deletionGeneration
+      - erasureRequestId
+      - completionEvidenceRef
+      description: Emitted only after the erasure workflow is completed, including
+        its backup/restore and registered-copy obligations. Never emitted for 202
+        acceptance or active_data_erased alone; unresolved retention is not completion.
+    AuditDisclosureReference:
+      type: object
+      additionalProperties: false
+      properties:
+        patientId:
+          "$ref": "#/components/schemas/OpaqueReference"
+        recordRevision:
+          type: integer
+          minimum: 1
+          maximum: 9007199254740991
+        fieldCategories:
+          type: array
+          uniqueItems: true
+          maxItems: 14
+          items:
+            type: string
+            enum:
+            - name
+            - name.display
+            - name.given
+            - name.family
+            - phones
+            - phones[].e164
+            - phones[].extension
+            - address
+            - address.countryCode
+            - address.lines
+            - address.locality
+            - address.administrativeArea
+            - address.postalCode
+            - comment
+      required:
+      - patientId
+      - recordRevision
+      - fieldCategories
+      description: Exact disclosed field categories for one patient, including authorized
+        container metadata; contains no values or principal-bound ETag.
+    DisclosureIntentData:
+      type: object
+      additionalProperties: false
+      properties:
+        actorRef:
+          "$ref": "#/components/schemas/OpaqueReference"
+        requestId:
+          "$ref": "#/components/schemas/OpaqueReference"
+        operation:
+          type: string
+          enum:
+          - patients.lookup.phone
+          - patients.read
+          - patients.create
+          - patients.update
+        decision:
+          type: string
+          const: authorized_disclosure_intent
+        policyVersion:
+          "$ref": "#/components/schemas/OpaqueReference"
+        disclosures:
+          type: array
+          maxItems: 100
+          items:
+            "$ref": "#/components/schemas/AuditDisclosureReference"
+      required:
+      - actorRef
+      - requestId
+      - operation
+      - decision
+      - policyVersion
+      - disclosures
+      description: Restricted application audit intent, not proof of browser receipt.
+        Empty disclosures is valid for an authorized no-match lookup. No token, raw
+        claims, search value, contact data or free text.
+    PatientCreatedEvent:
+      type: object
+      additionalProperties: false
+      properties:
+        specversion:
+          type: string
+          const: '1.0'
+        id:
+          type: string
+          format: uuid
+          description: Immutable event ID allocated once. Same source and id across
+            retry, relay and replay; uniqueness is source plus id.
+        source:
+          type: string
+          format: uri
+          pattern: "^urn:patient-contact:(preview|production):[a-z0-9-]+:[a-z0-9-]+:(domain|audit)$"
+          description: 'Publisher context: environment, AWS region and cell, without
+            tenant/patient identifiers. Deployment inventory must verify this trusted
+            source and residency.'
+        type:
+          type: string
+          const: patientcontact.patient.created.v1
+        time:
+          type: string
+          format: date-time
+          description: Application-recorded acceptance/intent time persisted with
+            the event. For mutations, prepared as part of the successful transaction;
+            not a DynamoDB commit timestamp and not replaced by retry time.
+        datacontenttype:
+          type: string
+          const: application/json
+        dataschema:
+          type: string
+          format: uri
+          const: urn:patient-contact:event-schema:patient.created:1.0.0
+        tenantid:
+          type: string
+          minLength: 8
+          maxLength: 128
+          pattern: "^[A-Za-z0-9_-]+$"
+          description: CloudEvents extension, lowercase name. Restricted tenant reference;
+            not authorization evidence or a routing override.
+        data:
+          "$ref": "#/components/schemas/PatientChangeData"
+      required:
+      - specversion
+      - id
+      - source
+      - type
+      - time
+      - datacontenttype
+      - dataschema
+      - tenantid
+      - data
+      description: Project allowlisted structured CloudEvents JSON profile. Unknown
+        envelope/data fields are rejected by this version; CloudEvents permits extensions
+        generally, but this project publishes only reviewed extensions.
+    PatientUpdatedEvent:
+      type: object
+      additionalProperties: false
+      properties:
+        specversion:
+          type: string
+          const: '1.0'
+        id:
+          type: string
+          format: uuid
+          description: Immutable event ID allocated once. Same source and id across
+            retry, relay and replay; uniqueness is source plus id.
+        source:
+          type: string
+          format: uri
+          pattern: "^urn:patient-contact:(preview|production):[a-z0-9-]+:[a-z0-9-]+:(domain|audit)$"
+          description: 'Publisher context: environment, AWS region and cell, without
+            tenant/patient identifiers. Deployment inventory must verify this trusted
+            source and residency.'
+        type:
+          type: string
+          const: patientcontact.patient.updated.v1
+        time:
+          type: string
+          format: date-time
+          description: Application-recorded acceptance/intent time persisted with
+            the event. For mutations, prepared as part of the successful transaction;
+            not a DynamoDB commit timestamp and not replaced by retry time.
+        datacontenttype:
+          type: string
+          const: application/json
+        dataschema:
+          type: string
+          format: uri
+          const: urn:patient-contact:event-schema:patient.updated:1.0.0
+        tenantid:
+          type: string
+          minLength: 8
+          maxLength: 128
+          pattern: "^[A-Za-z0-9_-]+$"
+          description: CloudEvents extension, lowercase name. Restricted tenant reference;
+            not authorization evidence or a routing override.
+        data:
+          "$ref": "#/components/schemas/PatientChangeData"
+      required:
+      - specversion
+      - id
+      - source
+      - type
+      - time
+      - datacontenttype
+      - dataschema
+      - tenantid
+      - data
+      description: Project allowlisted structured CloudEvents JSON profile. Unknown
+        envelope/data fields are rejected by this version; CloudEvents permits extensions
+        generally, but this project publishes only reviewed extensions.
+    PatientRestrictedEvent:
+      type: object
+      additionalProperties: false
+      properties:
+        specversion:
+          type: string
+          const: '1.0'
+        id:
+          type: string
+          format: uuid
+          description: Immutable event ID allocated once. Same source and id across
+            retry, relay and replay; uniqueness is source plus id.
+        source:
+          type: string
+          format: uri
+          pattern: "^urn:patient-contact:(preview|production):[a-z0-9-]+:[a-z0-9-]+:(domain|audit)$"
+          description: 'Publisher context: environment, AWS region and cell, without
+            tenant/patient identifiers. Deployment inventory must verify this trusted
+            source and residency.'
+        type:
+          type: string
+          const: patientcontact.patient.restricted.v1
+        time:
+          type: string
+          format: date-time
+          description: Application-recorded acceptance/intent time persisted with
+            the event. For mutations, prepared as part of the successful transaction;
+            not a DynamoDB commit timestamp and not replaced by retry time.
+        datacontenttype:
+          type: string
+          const: application/json
+        dataschema:
+          type: string
+          format: uri
+          const: urn:patient-contact:event-schema:patient.restricted:1.0.0
+        tenantid:
+          type: string
+          minLength: 8
+          maxLength: 128
+          pattern: "^[A-Za-z0-9_-]+$"
+          description: CloudEvents extension, lowercase name. Restricted tenant reference;
+            not authorization evidence or a routing override.
+        data:
+          "$ref": "#/components/schemas/PatientRestrictedData"
+      required:
+      - specversion
+      - id
+      - source
+      - type
+      - time
+      - datacontenttype
+      - dataschema
+      - tenantid
+      - data
+      description: Project allowlisted structured CloudEvents JSON profile. Unknown
+        envelope/data fields are rejected by this version; CloudEvents permits extensions
+        generally, but this project publishes only reviewed extensions.
+    PatientErasureCompletedEvent:
+      type: object
+      additionalProperties: false
+      properties:
+        specversion:
+          type: string
+          const: '1.0'
+        id:
+          type: string
+          format: uuid
+          description: Immutable event ID allocated once. Same source and id across
+            retry, relay and replay; uniqueness is source plus id.
+        source:
+          type: string
+          format: uri
+          pattern: "^urn:patient-contact:(preview|production):[a-z0-9-]+:[a-z0-9-]+:(domain|audit)$"
+          description: 'Publisher context: environment, AWS region and cell, without
+            tenant/patient identifiers. Deployment inventory must verify this trusted
+            source and residency.'
+        type:
+          type: string
+          const: patientcontact.patient.erasure.completed.v1
+        time:
+          type: string
+          format: date-time
+          description: Application-recorded acceptance/intent time persisted with
+            the event. For mutations, prepared as part of the successful transaction;
+            not a DynamoDB commit timestamp and not replaced by retry time.
+        datacontenttype:
+          type: string
+          const: application/json
+        dataschema:
+          type: string
+          format: uri
+          const: urn:patient-contact:event-schema:patient.erasure.completed:1.0.0
+        tenantid:
+          type: string
+          minLength: 8
+          maxLength: 128
+          pattern: "^[A-Za-z0-9_-]+$"
+          description: CloudEvents extension, lowercase name. Restricted tenant reference;
+            not authorization evidence or a routing override.
+        data:
+          "$ref": "#/components/schemas/ErasureCompletedData"
+      required:
+      - specversion
+      - id
+      - source
+      - type
+      - time
+      - datacontenttype
+      - dataschema
+      - tenantid
+      - data
+      description: Project allowlisted structured CloudEvents JSON profile. Unknown
+        envelope/data fields are rejected by this version; CloudEvents permits extensions
+        generally, but this project publishes only reviewed extensions.
+    AuditDisclosureIntentEvent:
+      type: object
+      additionalProperties: false
+      properties:
+        specversion:
+          type: string
+          const: '1.0'
+        id:
+          type: string
+          format: uuid
+          description: Immutable event ID allocated once. Same source and id across
+            retry, relay and replay; uniqueness is source plus id.
+        source:
+          type: string
+          format: uri
+          pattern: "^urn:patient-contact:(preview|production):[a-z0-9-]+:[a-z0-9-]+:(domain|audit)$"
+          description: 'Publisher context: environment, AWS region and cell, without
+            tenant/patient identifiers. Deployment inventory must verify this trusted
+            source and residency.'
+        type:
+          type: string
+          const: patientcontact.audit.disclosure.intent.v1
+        time:
+          type: string
+          format: date-time
+          description: Application-recorded acceptance/intent time persisted with
+            the event. For mutations, prepared as part of the successful transaction;
+            not a DynamoDB commit timestamp and not replaced by retry time.
+        datacontenttype:
+          type: string
+          const: application/json
+        dataschema:
+          type: string
+          format: uri
+          const: urn:patient-contact:event-schema:audit.disclosure.intent:1.0.0
+        tenantid:
+          type: string
+          minLength: 8
+          maxLength: 128
+          pattern: "^[A-Za-z0-9_-]+$"
+          description: CloudEvents extension, lowercase name. Restricted tenant reference;
+            not authorization evidence or a routing override.
+        data:
+          "$ref": "#/components/schemas/DisclosureIntentData"
+      required:
+      - specversion
+      - id
+      - source
+      - type
+      - time
+      - datacontenttype
+      - dataschema
+      - tenantid
+      - data
+      description: Project allowlisted structured CloudEvents JSON profile. Unknown
+        envelope/data fields are rejected by this version; CloudEvents permits extensions
+        generally, but this project publishes only reviewed extensions.
+    ErasureStartedData:
+      type: object
+      additionalProperties: false
+      properties:
+        patientId:
+          "$ref": "#/components/schemas/OpaqueReference"
+        recordRevision:
+          type: integer
+          minimum: 1
+          maximum: 9007199254740991
+          description: Monotonic internal patient aggregate revision, committed with
+            the mutation. Not the principal-bound REST ETag.
+        accessGeneration:
+          type: integer
+          minimum: 0
+          maximum: 9007199254740991
+          description: Monotonic patient restriction generation. Consumers cannot
+            reset restrictions from an older or ordinary update event.
+        deletionGeneration:
+          type: integer
+          minimum: 1
+          maximum: 9007199254740991
+          description: Monotonic erasure generation; a positive tombstone dominates
+            all non-erasure events for this immutable patient ID.
+        erasureRequestId:
+          "$ref": "#/components/schemas/OpaqueReference"
+      required:
+      - patientId
+      - recordRevision
+      - accessGeneration
+      - deletionGeneration
+      - erasureRequestId
+      description: 'Committed fact that authorized erasure processing entered its
+        restricted phase with a deletion generation. Not completion or unconditional
+        authority to purge: handler validates the current workflow, generation, holds
+        and participant fence.'
+    PatientErasureStartedEvent:
+      type: object
+      additionalProperties: false
+      properties:
+        specversion:
+          type: string
+          const: '1.0'
+        id:
+          type: string
+          format: uuid
+          description: Immutable event ID allocated once. Same source and id across
+            retry, relay and replay; uniqueness is source plus id.
+        source:
+          type: string
+          format: uri
+          pattern: "^urn:patient-contact:(preview|production):[a-z0-9-]+:[a-z0-9-]+:(domain|audit)$"
+          description: 'Publisher context: environment, AWS region and cell, without
+            tenant/patient identifiers. Deployment inventory must verify this trusted
+            source and residency.'
+        type:
+          type: string
+          const: patientcontact.patient.erasure.started.v1
+        time:
+          type: string
+          format: date-time
+          description: Application-recorded acceptance/intent time persisted with
+            the event. For mutations, prepared as part of the successful transaction;
+            not a DynamoDB commit timestamp and not replaced by retry time.
+        datacontenttype:
+          type: string
+          const: application/json
+        dataschema:
+          type: string
+          format: uri
+          const: urn:patient-contact:event-schema:patient.erasure.started:1.0.0
+        tenantid:
+          type: string
+          minLength: 8
+          maxLength: 128
+          pattern: "^[A-Za-z0-9_-]+$"
+          description: CloudEvents extension, lowercase name. Restricted tenant reference;
+            not authorization evidence or a routing override.
+        data:
+          "$ref": "#/components/schemas/ErasureStartedData"
+      required:
+      - specversion
+      - id
+      - source
+      - type
+      - time
+      - datacontenttype
+      - dataschema
+      - tenantid
+      - data
+      description: Project allowlisted structured CloudEvents JSON profile. Unknown
+        envelope/data fields are rejected by this version; CloudEvents permits extensions
+        generally, but this project publishes only reviewed extensions.
+x-document-metadata:
+  id: EVENT-CONTRACT-001
+  version: 0.1.0
+  status: proposed
+  approval_status: pending
+  authors:
+  - Codex
+  approvers: []
+  created: '2026-10-22'
+  updated: '2026-10-22'
+  owner_role: API and event contract owners
+  supersedes: []
+x-validation-status: JSON/reference/example consistency checks only until a pinned
+  AsyncAPI 3.1.0 parser, schema validator, renderer and Go generation profile are
+  qualified. No generated client or runtime conformance claimed.

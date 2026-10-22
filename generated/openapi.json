@@ -1,0 +1,2092 @@
+{
+  "openapi": "3.2.1",
+  "info": {
+    "title": "Patient Contact API — design draft",
+    "version": "0.1.0",
+    "description": "OpenAPI 3.2.1 design draft, not deployed or fully validator/generator-verified. info.version 0.1.0 identifies this proposal; /v1 and API-Version examples describe a future first GA 1.0.0 API, not an existing deployed release. Initial planning scenario: 20,000 isolated customer tenants; 10 million patient-organization records total; 20,000 requests/s aggregate. These are sizing assumptions, not maximum limits. Target p95 browser-visible <100 ms for exact phone lookup with displayed details and individual patient detail reads, under an agreed geography/load envelope; CRUD and asynchronous erasure have separate SLOs. Seven operations. Tenant residency region is independent of phone country and address country. Generated-client and server-interface conformance to this contract is the integration boundary; frontend/React implementation is outside this project's responsibility. Every declared application API operation requires the normal Authorization: Bearer JWT access token. Authenticate before API-version negotiation or resource semantics; missing or invalid credentials produce 401 even when the version is invalid or retired. Backend action/field/row authorization is mandatory on every path. No anonymous business, documentation or schema endpoint is declared. Identity is provider-pluggable: Cognito first, with other explicitly configured regional OIDC/OAuth providers supported behind the same bearer-access-token contract. All patient fields including comments are restricted, denied to operational logs/traces/metrics/session replay regardless of caller access. x-* metadata is descriptive and does not itself enforce restrictions. Use allowlisted telemetry only, with sanitized route templates and no raw IDs/phone/body/token/SQL bind values. Do not put patient data in URLs. Servers must reject wrong-region requests without forwarding sensitive bodies. Browser discovers correct regional endpoint before sending PII. This contract targets OpenAPI 3.2.1. Select, pin and verify compatible validators and Go/client generators before adoption; existing OpenAPI 3.1 support does not establish 3.2.1 compatibility. Never silently downgrade the specification to fit a tool. API-Version negotiation is documented under x-api-versioning and docs/api-versioning.md; version metadata is bounded operational metadata and contains no PII. Every operation requires one canonical API-Version: MAJOR.MINOR.PATCH request header selecting the exact supported published contract view; omission is an error and there are no defaults, aliases or fallback versions. The response reports that exact matched version, not the implementation build. Configurable supported major/minor/patch counts and explicit version pins determine the declared support set; published versions outside that set are automatically retired and decommissioned under docs/api-versioning.md. REST request and response bodies remain their declared typed JSON or problem JSON; downstream domain events use a separately governed CloudEvents contract in docs/events.md and do not wrap or change REST bodies. Isolated candidate validation uses the environment-scoped registry exception in docs/api-versioning.md; candidate builds do not establish production support. AsyncAPI defines downstream channels/messages alongside CloudEvents; see contracts/asyncapi.json."
+  },
+  "jsonSchemaDialect": "https://json-schema.org/draft/2020-12/schema",
+  "servers": [
+    {
+      "url": "https://us.api.example.invalid",
+      "description": "Documentation-only US regional endpoint placeholder; replace before generating production clients."
+    }
+  ],
+  "security": [
+    {
+      "AccessToken": []
+    }
+  ],
+  "paths": {
+    "/v1/session": {
+      "get": {
+        "operationId": "getSession",
+        "summary": "Read bounded memberships and regional routing",
+        "responses": {
+          "200": {
+            "description": "Current session and a page of tenant memberships.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/NoStore"
+              },
+              "X-Policy-Version": {
+                "$ref": "#/components/headers/PolicyVersion"
+              },
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              },
+              "API-Version": {
+                "$ref": "#/components/headers/ApiVersion"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Session"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "422": {
+            "$ref": "#/components/responses/UnprocessableContent"
+          },
+          "429": {
+            "$ref": "#/components/responses/TooManyRequests"
+          },
+          "503": {
+            "$ref": "#/components/responses/ServiceUnavailable"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          },
+          "410": {
+            "$ref": "#/components/responses/ApiVersionRetired"
+          }
+        },
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 25
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "minLength": 16,
+              "maxLength": 2048
+            },
+            "description": "Opaque authenticated/handle cursor bound to principal, membership policy version, page size and expiry. Contains no PII; invalid or expired => 400."
+          },
+          {
+            "$ref": "#/components/parameters/ApiVersion"
+          }
+        ]
+      }
+    },
+    "/v1/tenants/{tenantId}/patient-lookups": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/TenantId"
+        }
+      ],
+      "post": {
+        "operationId": "lookupPatientsByPhone",
+        "summary": "Exact phone lookup with authorized patient details",
+        "responses": {
+          "200": {
+            "description": "Complete authorized display projection for each match.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/NoStore"
+              },
+              "X-Policy-Version": {
+                "$ref": "#/components/headers/PolicyVersion"
+              },
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              },
+              "API-Version": {
+                "$ref": "#/components/headers/ApiVersion"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LookupResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "422": {
+            "$ref": "#/components/responses/UnprocessableContent"
+          },
+          "429": {
+            "$ref": "#/components/responses/TooManyRequests"
+          },
+          "503": {
+            "$ref": "#/components/responses/ServiceUnavailable"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          },
+          "410": {
+            "$ref": "#/components/responses/ApiVersionRetired"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LookupRequest"
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/ApiVersion"
+          }
+        ]
+      }
+    },
+    "/v1/tenants/{tenantId}/patients": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/TenantId"
+        }
+      ],
+      "post": {
+        "operationId": "createPatient",
+        "summary": "Create a tenant-scoped patient",
+        "responses": {
+          "201": {
+            "description": "Patient created and projected through current read policy.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/NoStore"
+              },
+              "X-Policy-Version": {
+                "$ref": "#/components/headers/PolicyVersion"
+              },
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              },
+              "ETag": {
+                "$ref": "#/components/headers/PatientETag"
+              },
+              "Location": {
+                "$ref": "#/components/headers/ResourceLocation"
+              },
+              "API-Version": {
+                "$ref": "#/components/headers/ApiVersion"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PatientRead"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "422": {
+            "$ref": "#/components/responses/UnprocessableContent"
+          },
+          "429": {
+            "$ref": "#/components/responses/TooManyRequests"
+          },
+          "503": {
+            "$ref": "#/components/responses/ServiceUnavailable"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          },
+          "410": {
+            "$ref": "#/components/responses/ApiVersionRetired"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PatientCreate"
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          },
+          {
+            "$ref": "#/components/parameters/ApiVersion"
+          }
+        ]
+      }
+    },
+    "/v1/tenants/{tenantId}/patients/{patientId}": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/TenantId"
+        },
+        {
+          "$ref": "#/components/parameters/PatientId"
+        }
+      ],
+      "get": {
+        "operationId": "getPatient",
+        "summary": "Read one authorized patient projection",
+        "responses": {
+          "200": {
+            "description": "Current authorized patient projection.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/NoStore"
+              },
+              "X-Policy-Version": {
+                "$ref": "#/components/headers/PolicyVersion"
+              },
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              },
+              "ETag": {
+                "$ref": "#/components/headers/PatientETag"
+              },
+              "API-Version": {
+                "$ref": "#/components/headers/ApiVersion"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PatientRead"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "422": {
+            "$ref": "#/components/responses/UnprocessableContent"
+          },
+          "429": {
+            "$ref": "#/components/responses/TooManyRequests"
+          },
+          "503": {
+            "$ref": "#/components/responses/ServiceUnavailable"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          },
+          "410": {
+            "$ref": "#/components/responses/ApiVersionRetired"
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/ApiVersion"
+          }
+        ]
+      },
+      "patch": {
+        "operationId": "patchPatient",
+        "summary": "Atomically update authorized fields",
+        "responses": {
+          "200": {
+            "description": "Updated patient projected through current read policy.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/NoStore"
+              },
+              "X-Policy-Version": {
+                "$ref": "#/components/headers/PolicyVersion"
+              },
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              },
+              "ETag": {
+                "$ref": "#/components/headers/PatientETag"
+              },
+              "API-Version": {
+                "$ref": "#/components/headers/ApiVersion"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PatientRead"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "422": {
+            "$ref": "#/components/responses/UnprocessableContent"
+          },
+          "429": {
+            "$ref": "#/components/responses/TooManyRequests"
+          },
+          "503": {
+            "$ref": "#/components/responses/ServiceUnavailable"
+          },
+          "412": {
+            "$ref": "#/components/responses/PreconditionFailed"
+          },
+          "428": {
+            "$ref": "#/components/responses/PreconditionRequired"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          },
+          "410": {
+            "$ref": "#/components/responses/ApiVersionRetired"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PatientPatch"
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IfMatch"
+          },
+          {
+            "$ref": "#/components/parameters/ApiVersion"
+          }
+        ]
+      }
+    },
+    "/v1/tenants/{tenantId}/erasure-requests": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/TenantId"
+        }
+      ],
+      "post": {
+        "operationId": "createErasureRequest",
+        "summary": "Start verified, policy-aware patient erasure",
+        "responses": {
+          "202": {
+            "description": "Erasure accepted for processing; acceptance is not proof of deletion.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/NoStore"
+              },
+              "X-Policy-Version": {
+                "$ref": "#/components/headers/PolicyVersion"
+              },
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              },
+              "Location": {
+                "$ref": "#/components/headers/ResourceLocation"
+              },
+              "Retry-After": {
+                "$ref": "#/components/headers/RetryAfter"
+              },
+              "API-Version": {
+                "$ref": "#/components/headers/ApiVersion"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erasure"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "422": {
+            "$ref": "#/components/responses/UnprocessableContent"
+          },
+          "429": {
+            "$ref": "#/components/responses/TooManyRequests"
+          },
+          "503": {
+            "$ref": "#/components/responses/ServiceUnavailable"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          },
+          "410": {
+            "$ref": "#/components/responses/ApiVersionRetired"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ErasureCreate"
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          },
+          {
+            "$ref": "#/components/parameters/ApiVersion"
+          }
+        ]
+      }
+    },
+    "/v1/tenants/{tenantId}/erasure-requests/{requestId}": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/TenantId"
+        },
+        {
+          "$ref": "#/components/parameters/RequestId"
+        }
+      ],
+      "get": {
+        "operationId": "getErasureRequest",
+        "summary": "Read authorized erasure progress",
+        "responses": {
+          "200": {
+            "description": "Erasure operation state.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/NoStore"
+              },
+              "X-Policy-Version": {
+                "$ref": "#/components/headers/PolicyVersion"
+              },
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              },
+              "API-Version": {
+                "$ref": "#/components/headers/ApiVersion"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erasure"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "422": {
+            "$ref": "#/components/responses/UnprocessableContent"
+          },
+          "429": {
+            "$ref": "#/components/responses/TooManyRequests"
+          },
+          "503": {
+            "$ref": "#/components/responses/ServiceUnavailable"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          },
+          "410": {
+            "$ref": "#/components/responses/ApiVersionRetired"
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/ApiVersion"
+          }
+        ]
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "AccessToken": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "description": "Required Authorization: Bearer signed JWT access token on every declared application API operation. Authentication is stateless token verification within the service: no per-request provider/user-info/introspection or session-server round trip. Accept tokens only from explicitly allowlisted region-configured OAuth 2.0 / OpenID Connect providers; Cognito is the initial AWS provider, not an exclusive regional dependency. Browser sign-in uses authorization code + PKCE. The configured provider adapter verifies an allowed signing algorithm and signature with issuer-scoped cached/rotated JWKS, exact issuer, expiry/not-before, access-token purpose, intended API/client binding, subject and required scopes. Conventional providers require the configured API audience in aud. Cognito additionally requires token_use=access and an allowed client_id; validate aud where the configured token profile includes it. Never accept an ID token, a user-ID-only token, a refresh token, or arbitrary identity/group assertions as an API credential. An unverified issuer may select an existing configured verifier only; it must never trigger arbitrary discovery or network access. Map the validated exact issuer+subject pair to an immutable application principal; never auto-link by email. Configured issuer-specific claims may carry bounded coarse scopes, tenant context, persona hints or policy version, but these are normalized inputs to backend authorization, not automatic grants. Unconfigured claims/groups are ignored for authorization. Current trusted service policy decides tenant membership, action/search, record and child-field permissions. Token claims and token expiry alone do not satisfy the documented five-second application-accepted revocation/freshness bound: locally evaluated policy needs authenticated current versions/watermarks, stale nodes fail closed, and authorization validity is rechecked before disclosure. This does not promise immediate recognition of unseen provider logout/disable; each adapter needs its documented propagation/token-lifetime qualification. Never log tokens or raw claims. No global broker, anonymous business/docs/schema endpoint, or provider-management endpoint is introduced."
+      }
+    },
+    "parameters": {
+      "TenantId": {
+        "name": "tenantId",
+        "in": "path",
+        "required": true,
+        "schema": {
+          "$ref": "#/components/schemas/OpaqueId"
+        },
+        "description": "Selected tenant; service validates active principal membership. Never trusted as an authorization claim."
+      },
+      "PatientId": {
+        "name": "patientId",
+        "in": "path",
+        "required": true,
+        "schema": {
+          "$ref": "#/components/schemas/OpaqueId"
+        }
+      },
+      "RequestId": {
+        "name": "requestId",
+        "in": "path",
+        "required": true,
+        "schema": {
+          "$ref": "#/components/schemas/OpaqueId"
+        }
+      },
+      "IdempotencyKey": {
+        "name": "Idempotency-Key",
+        "in": "header",
+        "required": true,
+        "schema": {
+          "type": "string",
+          "minLength": 16,
+          "maxLength": 128,
+          "pattern": "^[A-Za-z0-9_-]+$"
+        },
+        "description": "Opaque random key; never PII. Bound to region, tenant, principal, operation and payload fingerprint for at least 24h. Same request resumes/replays safely; changed payload returns 409. Authorization and erasure state must be rechecked before any replay; never replay stored unfiltered PII after rights change or deletion."
+      },
+      "IfMatch": {
+        "name": "If-Match",
+        "in": "header",
+        "required": true,
+        "schema": {
+          "type": "string",
+          "pattern": "^\"[A-Za-z0-9_-]+\"$"
+        },
+        "description": "Required quoted PatientRead.version from the lookup item or ETag from an equivalent single-item response. No wildcard. This is a principal/policy/projection-bound representation/concurrency token, never a bare row revision. Authorize the operation and every affected field first; then compare against the current representation token atomically with mutation. Any stale record revision, policy version or disclosed projection gives 412 without mutation. Missing header gives 428."
+      },
+      "ApiVersion": {
+        "name": "API-Version",
+        "in": "header",
+        "required": true,
+        "schema": {
+          "$ref": "#/components/schemas/ApiVersionPatch"
+        },
+        "description": "Authentication is required and precedes negotiation; missing/invalid credentials yield 401 before version/resource semantics. Every operation requires exactly one API-Version header with one canonical MAJOR.MINOR.PATCH value; HTTP header names are case-insensitive. On every /v1 operation, the header major must equal path major 1. Resolve the exact published contract version only when it belongs to the declared support set; the response reports that same version. No default, alias, version range, automatic patch upgrade or fallback is permitted. Missing, malformed, duplicate or list values => 400 api_version_invalid; path-major conflict => 400 api_version_path_mismatch; well-formed unknown/unpublished version => 400 api_version_unsupported; a known published version retired or excluded from declared support => 410 api_version_retired. Temporarily unavailable serving capacity for a supported version is an availability failure, not permission to substitute another version. These are future GA rules; no 1.0.0 deployment currently exists."
+      }
+    },
+    "schemas": {
+      "OpaqueId": {
+        "type": "string",
+        "minLength": 8,
+        "maxLength": 128,
+        "pattern": "^[A-Za-z0-9_-]+$"
+      },
+      "FieldAccess": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "readableFields": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "name",
+                "name.display",
+                "name.given",
+                "name.family",
+                "phones",
+                "phones[].e164",
+                "phones[].extension",
+                "address",
+                "address.countryCode",
+                "address.lines",
+                "address.locality",
+                "address.administrativeArea",
+                "address.postalCode",
+                "comment"
+              ]
+            },
+            "uniqueItems": true,
+            "maxItems": 14
+          },
+          "writableFields": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "name",
+                "name.display",
+                "name.given",
+                "name.family",
+                "phones",
+                "phones[].e164",
+                "phones[].extension",
+                "address",
+                "address.countryCode",
+                "address.lines",
+                "address.locality",
+                "address.administrativeArea",
+                "address.postalCode",
+                "comment"
+              ]
+            },
+            "uniqueItems": true,
+            "maxItems": 14
+          },
+          "policyVersion": {
+            "type": "string",
+            "minLength": 8,
+            "maxLength": 128,
+            "pattern": "^[A-Za-z0-9_-]+$"
+          }
+        },
+        "required": [
+          "readableFields",
+          "writableFields",
+          "policyVersion"
+        ],
+        "description": "Policy paths, including explicit object/array group permission and child paths, evaluated for this item. Parent permission alone never grants children. Group visibility and array cardinality require group read permission; children are projected independently. If no child is readable, omit the group. Child omissions indicate undisclosed fields; null indicates an authorized empty value. Metadata describes permissions, never stored-value existence. Writable paths do not imply readable paths. Returned capabilities are informational, not future authorization grants. ID, version and access are always present for authorized records."
+      },
+      "Name": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "display": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          },
+          "given": {
+            "type": "string",
+            "maxLength": 128
+          },
+          "family": {
+            "type": "string",
+            "maxLength": 128
+          }
+        },
+        "required": [
+          "display"
+        ],
+        "description": "Unicode text; display is authoritative for display. No requirement that every country has given/family name parts.",
+        "x-data-classification": "restricted-patient-data",
+        "x-log-policy": "deny"
+      },
+      "Address": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "countryCode": {
+            "type": "string",
+            "pattern": "^[A-Z]{2}$",
+            "description": "ISO 3166-1 alpha-2, validated against maintained country/numbering metadata. Country is not a data residency region. US is the initial UI default for national phone input; the frontend sends that explicit value. International-format phone input and international address representation are supported by these types independently of regional deployment rollout."
+          },
+          "lines": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 256
+            },
+            "minItems": 1,
+            "maxItems": 4
+          },
+          "locality": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 128
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "administrativeArea": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 128
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "postalCode": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 32
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "countryCode",
+          "lines",
+          "locality",
+          "administrativeArea",
+          "postalCode"
+        ],
+        "description": "US labels locality=City, administrativeArea=State, postalCode=ZIP. Postal codes are strings, preserving leading zeros.",
+        "x-data-classification": "restricted-patient-data",
+        "x-log-policy": "deny"
+      },
+      "Phone": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "e164": {
+            "type": "string",
+            "pattern": "^\\+[1-9][0-9]{1,14}$"
+          },
+          "extension": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[0-9]{1,10}$"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "e164",
+          "extension"
+        ],
+        "description": "Canonical phone number, never a patient identifier or a uniqueness key. Shared and reassigned phone numbers can match multiple patients. Extension is stored separately; launch lookup matches base E.164 number.",
+        "x-data-classification": "restricted-patient-data",
+        "x-log-policy": "deny"
+      },
+      "PhoneInput": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "phone": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64,
+            "x-data-classification": "restricted-patient-data",
+            "x-log-policy": "deny"
+          },
+          "countryCode": {
+            "type": "string",
+            "pattern": "^[A-Z]{2}$",
+            "description": "ISO 3166-1 alpha-2, validated against maintained country/numbering metadata. Country is not a data residency region. US is the initial UI default for national phone input; the frontend sends that explicit value. International-format phone input and international address representation are supported by these types independently of regional deployment rollout."
+          },
+          "extension": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[0-9]{1,10}$"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "phone"
+        ],
+        "anyOf": [
+          {
+            "properties": {
+              "phone": {
+                "pattern": "^\\+"
+              }
+            }
+          },
+          {
+            "required": [
+              "countryCode"
+            ]
+          }
+        ],
+        "description": "International input begins with +; otherwise countryCode is required for parsing. Runtime validates and normalizes using maintained numbering metadata; a regex is not proof of validity. Malformed or unsupported numbering inputs return 422. countryCode is syntactically mandatory whenever phone does not begin with +; the service additionally rejects malformed numbers, numbering inputs unsupported by its maintained metadata, and ambiguous national input. For input beginning with +, the international number is authoritative and countryCode is not used as the national parsing default. Country is parsing/validation context only and never chooses the residency region.",
+        "x-data-classification": "restricted-patient-data",
+        "x-log-policy": "deny"
+      },
+      "Problem": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "type": {
+            "type": "string",
+            "format": "uri"
+          },
+          "title": {
+            "type": "string",
+            "maxLength": 128
+          },
+          "status": {
+            "type": "integer",
+            "minimum": 400,
+            "maximum": 599
+          },
+          "code": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9_]*$"
+          },
+          "requestId": {
+            "type": "string",
+            "minLength": 8,
+            "maxLength": 128,
+            "pattern": "^[A-Za-z0-9_-]+$"
+          },
+          "errors": {
+            "type": "array",
+            "maxItems": 50,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "pointer": {
+                  "type": "string",
+                  "maxLength": 256
+                },
+                "code": {
+                  "type": "string",
+                  "pattern": "^[a-z][a-z0-9_]*$"
+                }
+              },
+              "required": [
+                "pointer",
+                "code"
+              ]
+            }
+          }
+        },
+        "required": [
+          "type",
+          "title",
+          "status",
+          "code",
+          "requestId"
+        ],
+        "description": "RFC 9457 application/problem+json. Fixed safe messages/codes and schema field pointers only. Never include submitted values, raw URLs, tokens, patient identifiers, database errors, stack traces or hidden-field presence."
+      },
+      "ErasureCreate": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "patientId": {
+            "$ref": "#/components/schemas/OpaqueId"
+          },
+          "reasonCode": {
+            "type": "string",
+            "enum": [
+              "subject_request",
+              "authorized_customer_request"
+            ]
+          }
+        },
+        "required": [
+          "patientId",
+          "reasonCode"
+        ],
+        "x-data-classification": "restricted-linkable-metadata",
+        "x-log-policy": "deny"
+      },
+      "Erasure": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "requestId": {
+            "$ref": "#/components/schemas/OpaqueId"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "requested",
+              "policy_review",
+              "restricted",
+              "purging",
+              "active_data_erased",
+              "backup_expiry_pending",
+              "completed",
+              "retained",
+              "failed"
+            ]
+          },
+          "retentionReasonCode": {
+            "type": "string",
+            "enum": [
+              "legal_hold",
+              "mandatory_retention",
+              "request_not_verified"
+            ]
+          },
+          "failureCode": {
+            "type": "string",
+            "enum": [
+              "dependency_unavailable",
+              "verification_failed",
+              "internal_failure"
+            ]
+          },
+          "backupExpiryAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "requestId",
+          "status",
+          "updatedAt"
+        ],
+        "description": "Status is access controlled. retained does not mean erased; completed means the scoped erasure obligations including backups are satisfied. active_data_erased and backup_expiry_pending explicitly do not claim complete erasure. Reason fields contain codes only. No patient contact values. Request/subject references are linkable restricted metadata, not anonymous data. GET must not resurrect or return subject data. Policy review may require an authorized human decision.",
+        "x-data-classification": "restricted-linkable-metadata",
+        "x-log-policy": "deny"
+      },
+      "TenantMembership": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "tenantId": {
+            "$ref": "#/components/schemas/OpaqueId"
+          },
+          "residencyRegion": {
+            "type": "string",
+            "minLength": 2,
+            "maxLength": 64
+          },
+          "apiBaseUrl": {
+            "type": "string",
+            "format": "uri"
+          },
+          "capabilities": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "patients.lookup.phone",
+                "patients.read",
+                "patients.create",
+                "patients.update",
+                "patients.erase"
+              ]
+            },
+            "uniqueItems": true,
+            "maxItems": 5
+          }
+        },
+        "required": [
+          "tenantId",
+          "residencyRegion",
+          "apiBaseUrl",
+          "capabilities"
+        ],
+        "description": "Trusted membership and routing metadata. apiBaseUrl is an HTTPS origin from the service allowlist; no patient data crosses regions to discover routing."
+      },
+      "Session": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "subjectId": {
+            "$ref": "#/components/schemas/OpaqueId",
+            "description": "Immutable opaque application principal ID, independent of authentication provider. It is not a raw provider subject or email. Backend resolves a validated exact trusted issuer+subject pair to this principal; equal subject strings from different issuers identify different external identities. Linking another external identity requires an explicit verified account-linking process; email matching never links automatically."
+          },
+          "memberships": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TenantMembership"
+            },
+            "maxItems": 100
+          },
+          "nextCursor": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 16,
+                "maxLength": 2048
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "subjectId",
+          "memberships",
+          "nextCursor"
+        ],
+        "description": "Membership listing is bounded and paginated. subjectId is the immutable application principal ID resolved from the validated trusted issuer+subject identity mapping. Provider replacement or a verified explicit identity link does not require changing application ownership or permissions. Capabilities guide UI only; the backend rechecks each action and field. No provider subjects, email-based identity links, or tokens are exposed by this response."
+      },
+      "PatientRead": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "patientId": {
+            "$ref": "#/components/schemas/OpaqueId"
+          },
+          "version": {
+            "type": "string",
+            "minLength": 8,
+            "maxLength": 128,
+            "pattern": "^[A-Za-z0-9_-]+$",
+            "description": "Opaque authenticated representation/concurrency token, not a bare row counter. It binds tenant, patient, principal, current policy version, patient write revision, and authorized detail representation variant. Different disclosed projections MUST produce different tokens. The quote-wrapped token is the strong ETag for that exact detail representation. A lookup item is issued the token for the equivalent single-item detail representation, enabling PATCH without another GET. Tokens cannot be transferred across principals, tenants or policy versions. On each PATCH, authorize first and compare with the current representation token atomically with mutation; any mismatch including policy/projection change is 412."
+          },
+          "access": {
+            "$ref": "#/components/schemas/FieldAccess"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/NameRead"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "x-data-classification": "restricted-patient-data",
+            "x-log-policy": "deny"
+          },
+          "phones": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PhoneRead"
+            },
+            "maxItems": 10,
+            "x-data-classification": "restricted-patient-data",
+            "x-log-policy": "deny",
+            "description": "Readable phones always serialize as an array; [] means authorized and no recorded phone. Omit the property if the group is restricted. Never serialize phones:null."
+          },
+          "address": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AddressRead"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "x-data-classification": "restricted-patient-data",
+            "x-log-policy": "deny"
+          },
+          "comment": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 4000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "x-data-classification": "restricted-patient-data",
+            "x-log-policy": "deny"
+          }
+        },
+        "required": [
+          "patientId",
+          "version",
+          "access"
+        ],
+        "description": "Fixed authorized detail projection. Every readable group/child is present; null means authorized but no recorded value for nullable fields; readable phones use [] when empty, omission means undisclosed by policy. Backend enforces these conditional projection rules beyond JSON Schema. ID, version and access are always present for an authorized record. Restricted values are never masked strings. Comments are untrusted plain text and potentially highly sensitive. version is an opaque representation/concurrency token bound to the authorization view, not a globally shared record counter. Its quoted form equals the single-item response ETag. Visible version changes reveal that the authorized record or permission projection changed, not which hidden field changed."
+      },
+      "PatientCreate": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "name": {
+            "$ref": "#/components/schemas/Name",
+            "x-data-classification": "restricted-patient-data",
+            "x-log-policy": "deny"
+          },
+          "phones": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PhoneInput"
+            },
+            "minItems": 1,
+            "maxItems": 10,
+            "x-data-classification": "restricted-patient-data",
+            "x-log-policy": "deny"
+          },
+          "address": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Address"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "x-data-classification": "restricted-patient-data",
+            "x-log-policy": "deny"
+          },
+          "comment": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 4000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "x-data-classification": "restricted-patient-data",
+            "x-log-policy": "deny"
+          }
+        },
+        "required": [
+          "name",
+          "phones"
+        ],
+        "description": "Unknown fields rejected. Caller must have create permission and write permission for every submitted field; any denial rejects the whole request atomically. Server assigns tenant, residency and patient ID. No client-controlled ACL or owner fields."
+      },
+      "PatientPatch": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "name": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/NamePatch"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "x-data-classification": "restricted-patient-data",
+            "x-log-policy": "deny"
+          },
+          "phones": {
+            "anyOf": [
+              {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/PhoneInput"
+                },
+                "minItems": 0,
+                "maxItems": 10
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "x-data-classification": "restricted-patient-data",
+            "x-log-policy": "deny"
+          },
+          "address": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AddressPatch"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "x-data-classification": "restricted-patient-data",
+            "x-log-policy": "deny"
+          },
+          "comment": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 4000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "x-data-classification": "restricted-patient-data",
+            "x-log-policy": "deny"
+          }
+        },
+        "required": [],
+        "minProperties": 1,
+        "description": "Recursive PATCH: absent=unchanged; null=clear; scalar/array value=replace; object=recursively update only supplied children. Go decoding preserves absent/null/value at every level. NamePatch and AddressPatch allow changes to individually writable child fields without changing omitted siblings. Every supplied or affected field requires current write permission. Clearing a whole group (including address:null or name:null) requires permission for the group AND every schema-defined child, regardless of whether any child currently has a value; otherwise reject atomically. Replacing or clearing phones likewise requires group permission AND every schema-defined phone child permission, including omitted replacement children that would be cleared; never infer authorization from current stored presence. Unknown, invalid or denied fields reject the entire request before mutation. null may clear fields; if the product requires retained mandatory fields, amend this draft before implementation. For phones, null or [] both clear the collection and subsequent readable responses return []; the all-schema-child permission rule still applies. PatientCreate requires at least one phone in this draft."
+      },
+      "LookupRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "phone": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64,
+            "x-data-classification": "restricted-patient-data",
+            "x-log-policy": "deny"
+          },
+          "countryCode": {
+            "type": "string",
+            "pattern": "^[A-Z]{2}$",
+            "description": "ISO 3166-1 alpha-2, validated against maintained country/numbering metadata. Country is not a data residency region. US is the initial UI default for national phone input; the frontend sends that explicit value. International-format phone input and international address representation are supported by these types independently of regional deployment rollout."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 20,
+            "default": 10
+          },
+          "cursor": {
+            "type": "string",
+            "minLength": 16,
+            "maxLength": 2048
+          }
+        },
+        "required": [
+          "phone"
+        ],
+        "anyOf": [
+          {
+            "properties": {
+              "phone": {
+                "pattern": "^\\+"
+              }
+            }
+          },
+          {
+            "required": [
+              "countryCode"
+            ]
+          }
+        ],
+        "description": "Exact base-number matching only, with international/national parsing rules as PhoneInput. Phone is in JSON body, never URL. Repeated pages repeat the same normalized filter. Cursor is opaque authenticated encrypted state or a random server-side handle, bound to tenant, principal, normalized filter, policy version, page size and expiry; never a raw or merely base64-encoded phone. Invalid, expired, mismatched or policy-stale cursors fail with a generic invalid_cursor 400. No cross-tenant, suffix, prefix, fuzzy, or bulk search. countryCode is syntactically mandatory whenever phone does not begin with +; the service additionally rejects malformed numbers, numbering inputs unsupported by its maintained metadata, and ambiguous national input. For input beginning with +, the international number is authoritative and countryCode is not used as the national parsing default. Country is parsing/validation context only and never chooses the residency region."
+      },
+      "LookupResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PatientRead"
+            },
+            "maxItems": 20
+          },
+          "nextCursor": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 16,
+                "maxLength": 2048
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "items",
+          "nextCursor"
+        ],
+        "description": "Returns the authorized detail projection in this single response. Multiple patients may share a number. Only permitted rows appear; no cross-tenant counts, hidden-record counts or global totals. No match is 200 with an empty array. The backend authorizes use of phone as a lookup predicate independently of phone display rights."
+      },
+      "NameRead": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "display": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 256
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "given": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 128
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "family": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 128
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [],
+        "description": "Read projection of Name. Each readable child is present, null if authorized but empty; restricted children omitted. Parent group must also be readable. Never serialize masked data.",
+        "x-data-classification": "restricted-patient-data",
+        "x-log-policy": "deny"
+      },
+      "AddressRead": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "countryCode": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[A-Z]{2}$",
+                "description": "ISO 3166-1 alpha-2, validated against maintained country/numbering metadata. Country is not a data residency region. US is the initial UI default for national phone input; the frontend sends that explicit value. International-format phone input and international address representation are supported by these types independently of regional deployment rollout."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "lines": {
+            "anyOf": [
+              {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 256
+                },
+                "minItems": 1,
+                "maxItems": 4
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "locality": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 128
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "administrativeArea": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 128
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "postalCode": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 32
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [],
+        "description": "Read projection of Address. Each readable child is present, null if authorized but empty; restricted children omitted. Parent group must also be readable. Never serialize masked data.",
+        "x-data-classification": "restricted-patient-data",
+        "x-log-policy": "deny"
+      },
+      "PhoneRead": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "e164": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^\\+[1-9][0-9]{1,14}$"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "extension": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[0-9]{1,10}$"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [],
+        "description": "Read projection of Phone. Each readable child is present, null if authorized but empty; restricted children omitted. Parent group must also be readable. Never serialize masked data.",
+        "x-data-classification": "restricted-patient-data",
+        "x-log-policy": "deny"
+      },
+      "NamePatch": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "display": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 256
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "given": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 128
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "family": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 128
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [],
+        "description": "Recursive object patch: absent child unchanged, null clears child, supplied value replaces child. Each changed child requires write permission. Unknown children rejected.",
+        "minProperties": 1,
+        "x-data-classification": "restricted-patient-data",
+        "x-log-policy": "deny"
+      },
+      "AddressPatch": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "countryCode": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[A-Z]{2}$",
+                "description": "ISO 3166-1 alpha-2, validated against maintained country/numbering metadata. Country is not a data residency region. US is the initial UI default for national phone input; the frontend sends that explicit value. International-format phone input and international address representation are supported by these types independently of regional deployment rollout."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "lines": {
+            "anyOf": [
+              {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 256
+                },
+                "minItems": 1,
+                "maxItems": 4
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "locality": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 128
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "administrativeArea": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 128
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "postalCode": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 32
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [],
+        "description": "Recursive object patch: absent child unchanged, null clears child, supplied value replaces child. Each changed child requires write permission. Unknown children rejected.",
+        "minProperties": 1,
+        "x-data-classification": "restricted-patient-data",
+        "x-log-policy": "deny"
+      },
+      "ApiVersionPatch": {
+        "type": "string",
+        "minLength": 5,
+        "maxLength": 48,
+        "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)$",
+        "description": "Canonical exact published API contract version used in the required request header and, after safe resolution, identically in the response header. MAJOR.MINOR.PATCH only: no leading zeros, prerelease/build suffix, wildcard, range, latest token, list or duplicate header value. Exact contract selection does not freeze implementation/container builds; any refreshed implementation must preserve this published view and current security controls. Example 1.0.0 is illustrative future GA, not a deployed release.",
+        "examples": [
+          "1.0.0"
+        ]
+      }
+    },
+    "headers": {
+      "NoStore": {
+        "description": "Every response, including errors, MUST use no-store. Do not cache patient data at CDN, browser service worker or shared proxy.",
+        "schema": {
+          "type": "string",
+          "enum": [
+            "no-store"
+          ]
+        }
+      },
+      "PolicyVersion": {
+        "description": "Opaque evaluation policy version; optional informational header, never authority.",
+        "schema": {
+          "type": "string",
+          "minLength": 8,
+          "maxLength": 128,
+          "pattern": "^[A-Za-z0-9_-]+$"
+        }
+      },
+      "RequestId": {
+        "description": "Opaque correlation ID; no patient data.",
+        "schema": {
+          "type": "string",
+          "minLength": 8,
+          "maxLength": 128,
+          "pattern": "^[A-Za-z0-9_-]+$"
+        }
+      },
+      "RetryAfter": {
+        "schema": {
+          "type": "string",
+          "pattern": "^[0-9]+$"
+        },
+        "description": "Suggested retry delay in seconds."
+      },
+      "PatientETag": {
+        "description": "Required on successful single-patient GET/create/PATCH. Strong validator for this exact authorized detail representation; the value is the quoted PatientRead.version. Tokens bind principal, policy, record revision and disclosed representation, so differing field projections never share an ETag. Lookup items issue the same token for their equivalent detail representation. Send verbatim as If-Match. Conditional GET/304 is not offered in this draft; responses remain no-store.",
+        "schema": {
+          "type": "string",
+          "pattern": "^\"[A-Za-z0-9_-]+\"$"
+        }
+      },
+      "ResourceLocation": {
+        "description": "Relative status/resource URL on the current regional origin; contains opaque IDs only.",
+        "schema": {
+          "type": "string"
+        }
+      },
+      "ApiVersion": {
+        "description": "Custom response header (case-insensitive name) containing the exact supported published contract version matched from the required request header; it must equal that resolved request version, not a newer patch or the implementation build. Authenticate first; missing/invalid authentication returns 401 and omits this header. After authentication, include it on every application response once that exact version has been safely resolved, including subsequent authorization, validation or availability/server failures. Omit for missing, malformed, path-conflicting, unknown, retired or otherwise unresolved versions; never reflect unchecked input or fabricate a version. An unrelated 400 after safe valid resolution still carries this header. No tenant/identity/resource semantics are disclosed to unauthenticated callers. Protocol/ingress failures before application resolution may omit it. Example 1.0.0 is not a release or deployment claim.",
+        "schema": {
+          "$ref": "#/components/schemas/ApiVersionPatch"
+        }
+      },
+      "BearerChallenge": {
+        "description": "Required on 401. Fixed Bearer authentication challenge; no raw token, claim, identity or version details.",
+        "schema": {
+          "type": "string",
+          "enum": [
+            "Bearer"
+          ]
+        }
+      }
+    },
+    "responses": {
+      "BadRequest": {
+        "description": "Only after successful authentication and applicable authorization. Missing/invalid credentials instead return 401 without version negotiation. Malformed JSON, invalid/expired/mismatched cursor, or API-Version negotiation failure. Version errors use stable codes: api_version_invalid (missing, malformed, duplicate or list header value), api_version_path_mismatch (header/path major conflict), api_version_unsupported (well-formed unknown/unpublished exact version). Never default, fall back or echo submitted values. A safely resolved exact version is returned for unrelated errors; unresolved version-negotiation errors omit API-Version.",
+        "headers": {
+          "Cache-Control": {
+            "$ref": "#/components/headers/NoStore"
+          },
+          "X-Policy-Version": {
+            "$ref": "#/components/headers/PolicyVersion"
+          },
+          "X-Request-Id": {
+            "$ref": "#/components/headers/RequestId"
+          },
+          "API-Version": {
+            "$ref": "#/components/headers/ApiVersion"
+          }
+        },
+        "content": {
+          "application/problem+json": {
+            "schema": {
+              "$ref": "#/components/schemas/Problem"
+            }
+          }
+        }
+      },
+      "Unauthorized": {
+        "description": "Missing, invalid, expired or known-revoked access credential/application identity. Authentication is evaluated before API-version or resource semantics, so 401 takes precedence over malformed/unsupported/retired-version errors and protected resource existence. API-Version and X-Policy-Version are omitted because no authorization/version result is disclosed. A valid JWT alone does not establish current permission; application authorization denials use the applicable 403 or concealed 404 instead.",
+        "headers": {
+          "Cache-Control": {
+            "$ref": "#/components/headers/NoStore"
+          },
+          "X-Request-Id": {
+            "$ref": "#/components/headers/RequestId"
+          },
+          "WWW-Authenticate": {
+            "$ref": "#/components/headers/BearerChallenge"
+          }
+        },
+        "content": {
+          "application/problem+json": {
+            "schema": {
+              "$ref": "#/components/schemas/Problem"
+            }
+          }
+        }
+      },
+      "Forbidden": {
+        "description": "Authenticated principal lacks action or submitted-field permission; no partial write.",
+        "headers": {
+          "Cache-Control": {
+            "$ref": "#/components/headers/NoStore"
+          },
+          "X-Policy-Version": {
+            "$ref": "#/components/headers/PolicyVersion"
+          },
+          "X-Request-Id": {
+            "$ref": "#/components/headers/RequestId"
+          },
+          "API-Version": {
+            "$ref": "#/components/headers/ApiVersion"
+          }
+        },
+        "content": {
+          "application/problem+json": {
+            "schema": {
+              "$ref": "#/components/schemas/Problem"
+            }
+          }
+        }
+      },
+      "NotFound": {
+        "description": "Unknown or inaccessible tenant/resource; identical outward result without confirming existence.",
+        "headers": {
+          "Cache-Control": {
+            "$ref": "#/components/headers/NoStore"
+          },
+          "X-Policy-Version": {
+            "$ref": "#/components/headers/PolicyVersion"
+          },
+          "X-Request-Id": {
+            "$ref": "#/components/headers/RequestId"
+          },
+          "API-Version": {
+            "$ref": "#/components/headers/ApiVersion"
+          }
+        },
+        "content": {
+          "application/problem+json": {
+            "schema": {
+              "$ref": "#/components/schemas/Problem"
+            }
+          }
+        }
+      },
+      "Conflict": {
+        "description": "Wrong regional endpoint, erasure conflict or reused idempotency key with different payload. No automatic cross-region forwarding of patient data.",
+        "headers": {
+          "Cache-Control": {
+            "$ref": "#/components/headers/NoStore"
+          },
+          "X-Policy-Version": {
+            "$ref": "#/components/headers/PolicyVersion"
+          },
+          "X-Request-Id": {
+            "$ref": "#/components/headers/RequestId"
+          },
+          "API-Version": {
+            "$ref": "#/components/headers/ApiVersion"
+          }
+        },
+        "content": {
+          "application/problem+json": {
+            "schema": {
+              "$ref": "#/components/schemas/Problem"
+            }
+          }
+        }
+      },
+      "UnprocessableContent": {
+        "description": "Schema, phone-country, numbering or domain validation failed; codes and schema pointers only.",
+        "headers": {
+          "Cache-Control": {
+            "$ref": "#/components/headers/NoStore"
+          },
+          "X-Policy-Version": {
+            "$ref": "#/components/headers/PolicyVersion"
+          },
+          "X-Request-Id": {
+            "$ref": "#/components/headers/RequestId"
+          },
+          "API-Version": {
+            "$ref": "#/components/headers/ApiVersion"
+          }
+        },
+        "content": {
+          "application/problem+json": {
+            "schema": {
+              "$ref": "#/components/schemas/Problem"
+            }
+          }
+        }
+      },
+      "TooManyRequests": {
+        "description": "Tenant/principal rate limit exceeded.",
+        "headers": {
+          "Cache-Control": {
+            "$ref": "#/components/headers/NoStore"
+          },
+          "X-Policy-Version": {
+            "$ref": "#/components/headers/PolicyVersion"
+          },
+          "X-Request-Id": {
+            "$ref": "#/components/headers/RequestId"
+          },
+          "Retry-After": {
+            "$ref": "#/components/headers/RetryAfter"
+          },
+          "API-Version": {
+            "$ref": "#/components/headers/ApiVersion"
+          }
+        },
+        "content": {
+          "application/problem+json": {
+            "schema": {
+              "$ref": "#/components/schemas/Problem"
+            }
+          }
+        }
+      },
+      "ServiceUnavailable": {
+        "description": "Service unavailable or authorization freshness cannot be guaranteed.",
+        "headers": {
+          "Cache-Control": {
+            "$ref": "#/components/headers/NoStore"
+          },
+          "X-Policy-Version": {
+            "$ref": "#/components/headers/PolicyVersion"
+          },
+          "X-Request-Id": {
+            "$ref": "#/components/headers/RequestId"
+          },
+          "Retry-After": {
+            "$ref": "#/components/headers/RetryAfter"
+          },
+          "API-Version": {
+            "$ref": "#/components/headers/ApiVersion"
+          }
+        },
+        "content": {
+          "application/problem+json": {
+            "schema": {
+              "$ref": "#/components/schemas/Problem"
+            }
+          }
+        }
+      },
+      "InternalError": {
+        "description": "Internal failure; fixed safe problem code and no sensitive diagnostics.",
+        "headers": {
+          "Cache-Control": {
+            "$ref": "#/components/headers/NoStore"
+          },
+          "X-Policy-Version": {
+            "$ref": "#/components/headers/PolicyVersion"
+          },
+          "X-Request-Id": {
+            "$ref": "#/components/headers/RequestId"
+          },
+          "API-Version": {
+            "$ref": "#/components/headers/ApiVersion"
+          }
+        },
+        "content": {
+          "application/problem+json": {
+            "schema": {
+              "$ref": "#/components/schemas/Problem"
+            }
+          }
+        }
+      },
+      "PreconditionFailed": {
+        "description": "If-Match does not match the current authorized detail representation, including changed record revision, policy version or field projection; no mutation.",
+        "headers": {
+          "Cache-Control": {
+            "$ref": "#/components/headers/NoStore"
+          },
+          "X-Policy-Version": {
+            "$ref": "#/components/headers/PolicyVersion"
+          },
+          "X-Request-Id": {
+            "$ref": "#/components/headers/RequestId"
+          },
+          "API-Version": {
+            "$ref": "#/components/headers/ApiVersion"
+          }
+        },
+        "content": {
+          "application/problem+json": {
+            "schema": {
+              "$ref": "#/components/schemas/Problem"
+            }
+          }
+        }
+      },
+      "PreconditionRequired": {
+        "description": "If-Match is required; no mutation.",
+        "headers": {
+          "Cache-Control": {
+            "$ref": "#/components/headers/NoStore"
+          },
+          "X-Policy-Version": {
+            "$ref": "#/components/headers/PolicyVersion"
+          },
+          "X-Request-Id": {
+            "$ref": "#/components/headers/RequestId"
+          },
+          "API-Version": {
+            "$ref": "#/components/headers/ApiVersion"
+          }
+        },
+        "content": {
+          "application/problem+json": {
+            "schema": {
+              "$ref": "#/components/schemas/Problem"
+            }
+          }
+        }
+      },
+      "ApiVersionRetired": {
+        "description": "Only after successful authentication and applicable authorization. Missing/invalid credentials instead return 401 without version negotiation. The exact requested published version is retired or excluded from the declared support set: 410 api_version_retired. No fallback to another patch, minor or major. No supported contract is resolved, so omit API-Version rather than fabricating a selection. Configurable support counts and explicit support pins govern automatic decommissioning; use only authoritative published lifecycle metadata. No tenant, patient, identity or submitted-header values appear in the problem.",
+        "headers": {
+          "Cache-Control": {
+            "$ref": "#/components/headers/NoStore"
+          },
+          "X-Policy-Version": {
+            "$ref": "#/components/headers/PolicyVersion"
+          },
+          "X-Request-Id": {
+            "$ref": "#/components/headers/RequestId"
+          },
+          "API-Version": {
+            "$ref": "#/components/headers/ApiVersion"
+          }
+        },
+        "content": {
+          "application/problem+json": {
+            "schema": {
+              "$ref": "#/components/schemas/Problem"
+            }
+          }
+        }
+      }
+    }
+  },
+  "x-privacy-contract": {
+    "metadata-enforcement": "Application code, policy engine, safe DTO projection and telemetry allowlists must enforce metadata; schema extensions do not enforce it.",
+    "field-classification-default": "Deny logging for every new field until explicitly classified and reviewed.",
+    "permission-cache-key": "region + tenant + principal + action + policyVersion; projections also bind record version. Never reuse a raw or filtered user response for another principal.",
+    "browser-cache": "no-store responses; no persistent patient cache; in-memory data scoped by tenant/principal/policy and cleared on logout, tenant switch, rights change, and erasure notification.",
+    "erasure-read-barrier": "Approved restricted/purging requests must install a strong read/write deny barrier before reporting restricted; replicas, caches, pending jobs and idempotency replay must honor it. retained is not erased. Restore quarantines and reapplies deletion ledger before traffic resumes."
+  },
+  "x-api-versioning": {
+    "policy-document": "docs/api-versioning.md",
+    "draft-versus-service-version": "info.version 0.1.0 identifies the current design proposal. /v1 and request/response 1.0.0 illustrate a proposed future first GA release; no deployment is asserted.",
+    "request-header": "API-Version is required on every declared operation, with a case-insensitive HTTP header name and exactly one canonical MAJOR.MINOR.PATCH value. No default, alias, wildcard, range, prerelease/build suffix, duplicate or list value.",
+    "path-binding": "Path major and header major must match. All seven current operation paths are /v1.",
+    "error-policy": {
+      "api_version_invalid": 400,
+      "api_version_path_mismatch": 400,
+      "api_version_unsupported": 400,
+      "api_version_retired": 410
+    },
+    "response-header": "After successful authentication and safe resolution of an exact supported published version, include that same API-Version on all subsequent application responses. Missing/invalid authentication returns 401 with no API-Version. Omit for missing/malformed/path-conflicting/unknown/retired/unresolved versions. Never fabricate a match or reflect unchecked input. A supported version with temporarily unavailable capacity uses the availability response and, once safely resolved, still reports its exact version.",
+    "cors": "For explicitly trusted origins, allow the API-Version request header and expose API-Version, Deprecation, Sunset and Link response headers when emitted, alongside other contract-required headers. Preserve exact-origin and credential policies. This is an integration contract, not a frontend implementation. Transport-level CORS preflight, if needed by deployment, advertises only configured protocol permissions and never serves business data, protected resource/version semantics, or anonymous documentation/schema. No preflight application operation is introduced here.",
+    "retirement-headers": "Deprecation, Sunset and Link may be emitted only with authoritative values from the declared support/lifecycle policy. Their concrete Header Object definitions/examples remain a contract follow-up governed by docs/api-versioning.md. Automatic decommissioning follows configured counts and explicit retention pins; no numeric support counts or dates are established by this draft.",
+    "telemetry": "Use only configured resolved version identifiers or a finite invalid/unsupported/retired outcome class as bounded metric labels. Never label metrics or log arbitrary raw API-Version values. Version metadata contains no patient values or tenant identity.",
+    "tooling-gate": "OpenAPI 3.2.1 validators and Go/client generator compatibility must be selected and verified; no full validation or generated-code compatibility is claimed. No silent downgrade.",
+    "authentication-order": "All declared operations require bearer access-token authentication before API-version negotiation or protected resource semantics. Missing/invalid authentication returns 401 regardless of header/version/resource input; it omits API-Version. Authenticated and appropriately authorized version requests then use the documented 400/410 outcomes. Version selection never grants authorization.",
+    "missing-header": "After successful authentication and applicable authorization, omission returns 400 api_version_invalid. Missing or invalid authentication returns 401 first; there is no implicit default version.",
+    "exact-selection": "Resolve exactly the published supported version named by the request; never select a newer compatible patch automatically. Response API-Version equals the exact resolved request version. Published contract views are independent of implementation/container build versions; current privacy, erasure and authorization policy remains mandatory for every view.",
+    "support-policy": "The declared support set is calculated from configured supported major, minor and patch counts plus explicit version-retention pins under docs/api-versioning.md. Counts and pins are operator policy, not client header aliases. Published versions outside that set are automatically retired and their serving capacity decommissioned. Retain enough lifecycle metadata to return 410 for those known retired versions; never silently reactivate them during an image refresh or downgrade. This design specifies no deployed support configuration or approved numeric counts.",
+    "candidate-validation": "The published-supported rule governs ordinary production admission. Isolated preview/ephemeral endpoints may admit an exact proposed numeric contract version from an environment-scoped candidate registry, only for approved synthetic identities/tenants. Candidate build IDs are separate, with no prerelease header syntax. Restricted pre-GA production validation is separately fenced from public admission. Candidate traffic cannot create a production GA record, count toward support windows, or appear as real production usage. Follow docs/api-versioning.md; never expose an unapproved candidate by accepting a client-supplied environment flag."
+  },
+  "x-authentication-contract": {
+    "operation-invariant": "Every declared operation inherits the root security requirement AccessToken. No operation may set security: [] or provide an empty alternative security requirement. No anonymous business/docs/schema endpoint is declared.",
+    "credential": "Authorization: Bearer signed JWT API access token. Cognito is initial AWS implementation; configured regional provider adapters remain supported.",
+    "stateless-authentication": "Verify token cryptography/purpose/issuer/API binding locally using trusted configured cached key material. No synchronous provider/user-info/introspection or session-server call on each patient request is required.",
+    "coarse-token-context": "Only explicitly configured issuer claim mappings may supply bounded scopes, scoped tenant context, persona hints or policy version. These are untrusted until token validation and never grant access independently. No arbitrary group/role claim becomes an application grant.",
+    "authorization-authority": "Each service applies trusted current backend tenant/action/search/record/field policy to the application principal. Application policy state and revocation freshness remain necessary even though token authentication is stateless.",
+    "revocation-bound": "Preserve the documented five-second bound from application acceptance of membership/session/policy revocation. Local policy evaluation requires authenticated authoritative versions/watermarks; stale or unverifiably fresh state fails closed. Carry decision validity through datastore/audit work and recheck before disclosure. Token expiry alone is insufficient. No equivalent bound is claimed for unseen provider-side logout/disable.",
+    "failure-order": "Authenticate first. Missing/invalid access credentials => 401 with fixed WWW-Authenticate: Bearer, no API-Version/policy-version and no protected resource/version semantics. Authenticated and appropriately authorized callers receive normal version/resource outcomes.",
+    "implementation-status": "Documentation/contract requirement only; no provider adapter, runtime enforcement, authorization distributor or session server is implemented by this artifact."
+  },
+  "x-document": {
+    "id": "API-CONTRACT-001",
+    "version": "0.2.0",
+    "status": "proposed",
+    "approval_status": "pending",
+    "authors": [
+      "Codex"
+    ],
+    "approvers": [],
+    "created": "2026-10-22",
+    "updated": "2026-10-22",
+    "owner_role": "API contract owner",
+    "supersedes": [],
+    "superseded_by": [],
+    "references": [
+      "docs/project-standards.md",
+      "docs/api-versioning.md",
+      "docs/identity-and-personas.md",
+      "docs/diagrams.md",
+      "docs/events.md",
+      "contracts/asyncapi.json"
+    ],
+    "generation_note": "Canonical design source. Generated exports are documentation snapshots, not runtime-generated schemas or released service contracts.",
+    "events_note": "REST bodies retain their declared typed JSON and application/problem+json shapes. Downstream domain events use the separate CloudEvents contract in docs/events.md; that event contract does not introduce a REST envelope, operation or anonymous endpoint. Event semantics and delivery behavior require their own documentation and tests."
+  }
+}

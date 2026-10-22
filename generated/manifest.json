@@ -1,0 +1,53 @@
+{
+  "artifact_kind": "design-time documentation export",
+  "generated_on": "2026-10-22",
+  "canonical_source": "../openapi.json",
+  "source_sha256": "5c11e599971ce556f1e9e29e436e6b7582602f079537042e573d138e2567155e",
+  "openapi_version": "3.2.1",
+  "api_draft_version": "0.1.0",
+  "operation_count": 7,
+  "selected_erd_schemas": [
+    "PatientRead",
+    "NameRead",
+    "PhoneRead",
+    "AddressRead",
+    "FieldAccess",
+    "LookupResponse",
+    "Session",
+    "TenantMembership",
+    "Erasure"
+  ],
+  "outputs": {
+    "openapi.json": "5c11e599971ce556f1e9e29e436e6b7582602f079537042e573d138e2567155e",
+    "openapi.yaml": "2ee5f2018babe739b28f0fa601fcef8fbecdd8061a19264e544d99989fbd3aba",
+    "asyncapi.json": "82b52bc3a17c10d6f5d9dbcedab36157da4ae1d0249c031e0366cd9e9668a8fa",
+    "asyncapi.yaml": "708cc165f2ca627d593db9e814eba342b208714014341078b82d6b69eb9861fb",
+    "contract-entities.mmd": "4fd289b7ed44d2153b6b45b899607c98bec47140800f1dab6b61370849f54d73",
+    "contract-entities.md": "117da1a3e3d7243145c332a49c420ba581432ace31a8f6b51440cf9f194a5154",
+    "README.md": "040ea434e6073f77a4382a0c1043c66adb83aedffe54a38b4616b56610ebbe91"
+  },
+  "validation_scope": [
+    "JSON parse and local references",
+    "JSON/YAML round-trip equality",
+    "required bearer security inheritance",
+    "schema-subset example checks",
+    "source/output hashes"
+  ],
+  "not_verified": [
+    "full OpenAPI3.2.1 validation",
+    "generator compatibility/compilation",
+    "Mermaid rendered layout",
+    "runtime or load tests",
+    "full AsyncAPI3.1.0 validation",
+    "CloudEvents SDK round-trip and broker delivery"
+  ],
+  "sources": {
+    "openapi.json": "5c11e599971ce556f1e9e29e436e6b7582602f079537042e573d138e2567155e",
+    "contracts/asyncapi.json": "82b52bc3a17c10d6f5d9dbcedab36157da4ae1d0249c031e0366cd9e9668a8fa",
+    "examples.json": "0b3e981c1dc5a9fa67130952198af90210342412b7066eaea42d3b8af372f4b2",
+    "contracts/event-examples.json": "36b1d98e411d415ca535fe9b2ceca881d009dde68966e2a1859b68f0df01464d"
+  },
+  "asyncapi_version": "3.1.0",
+  "asyncapi_draft_version": "0.1.0",
+  "event_message_count": 6
+}
